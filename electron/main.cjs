@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog } = require('electron');
 const path = require('path');
 const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion, installOpencode, checkForUpdate, updateOpencode } = require('./sidecar.cjs');
 
@@ -112,6 +112,14 @@ ipcMain.handle('update-opencode', async (event) => {
   } catch (err) {
     return { success: false, error: err.message };
   }
+});
+
+ipcMain.handle('select-folder', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory'],
+  });
+  if (result.canceled) return { canceled: true };
+  return { canceled: false, path: result.filePaths[0] };
 });
 
 ipcMain.handle('relaunch-app', () => {

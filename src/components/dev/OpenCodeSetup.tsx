@@ -308,7 +308,7 @@ export default function OpenCodeSetup({ state, onInstall, onRetry }: OpenCodeSet
             ⬇️ 下载并安装 Kingdee Code
           </button>
           <p className="dt-setup-hint">
-            约 35 MB，来自 GitHub Releases
+            约 35 MB，来自 Kingdee 服务器
           </p>
         </div>
       </div>

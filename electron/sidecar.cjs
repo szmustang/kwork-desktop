@@ -58,24 +58,56 @@ function getOpencodeVersion() {
 
 /* ── Download & Install ── */
 
-function getDownloadUrl() {
-  const platform = process.platform;   // darwin, linux, win32
-  const arch = process.arch;           // arm64, x64
-  let fileName;
-  if (platform === 'darwin') {
-    fileName = arch === 'arm64' ? 'opencode-darwin-arm64.zip' : 'opencode-darwin-x64.zip';
-  } else if (platform === 'linux') {
-    fileName = arch === 'arm64' ? 'opencode-linux-arm64.tar.gz' : 'opencode-linux-x64.tar.gz';
-  } else {
-    fileName = arch === 'arm64' ? 'opencode-windows-arm64.zip' : 'opencode-windows-x64.zip';
+const CDN_BASE_URL = 'http://tdmrxr8op.hn-bkt.clouddn.com';
+const BUILD_VERSION_URL = `${CDN_BASE_URL}/buildVersion.json`;
+
+/**
+ * Fetch buildVersion.json from CDN.
+ * Returns { version, fileName } or null on failure.
+ */
+function fetchBuildVersion() {
+  return new Promise((resolve) => {
+    const httpModule = BUILD_VERSION_URL.startsWith('https') ? https : http;
+    httpModule.get(BUILD_VERSION_URL, { headers: { 'User-Agent': 'kwork-desktop' }, timeout: 10000 }, (res) => {
+      if (res.statusCode !== 200) {
+        res.resume();
+        return resolve(null);
+      }
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          resolve(json);
+        } catch (_) {
+          resolve(null);
+        }
+      });
+    }).on('error', () => resolve(null))
+      .on('timeout', function() { this.destroy(); resolve(null); });
+  });
+}
+
+/**
+ * Get download URL from CDN based on buildVersion.json.
+ * Returns { url, fileName } or throws on failure.
+ */
+async function getDownloadInfo() {
+  const buildVersion = await fetchBuildVersion();
+  if (!buildVersion || !buildVersion.fileName) {
+    throw new Error('Failed to fetch buildVersion.json from CDN');
   }
-  return `https://github.com/szmustang/ClawWork/releases/latest/download/${fileName}`;
+  return {
+    url: `${CDN_BASE_URL}/${buildVersion.fileName}`,
+    fileName: buildVersion.fileName,
+  };
 }
 
 function downloadFile(url, destPath, onProgress) {
   return new Promise((resolve, reject) => {
     const follow = (u) => {
-      https.get(u, { headers: { 'User-Agent': 'claude-code-desktop' } }, (res) => {
+      const httpModule = u.startsWith('https') ? https : http;
+      httpModule.get(u, { headers: { 'User-Agent': 'kwork-desktop' } }, (res) => {
         // Handle redirects
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           return follow(res.headers.location);
@@ -127,10 +159,10 @@ async function installOpencode(onProgress) {
   const binDir = getAppBinDir();
   fs.mkdirSync(binDir, { recursive: true });
 
-  const url = getDownloadUrl();
+  const downloadInfo = await getDownloadInfo();
+  const url = downloadInfo.url;
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-'));
-  const isLinux = process.platform === 'linux';
-  const archiveName = isLinux ? 'opencode.tar.gz' : 'opencode.zip';
+  const archiveName = downloadInfo.fileName;
   const zipPath = path.join(tmpDir, archiveName);
 
   try {
@@ -183,42 +215,15 @@ function findFile(dir, name) {
 /* ── Update Check ── */
 
 /**
- * Fetch latest release version from GitHub.
- * Returns version string (e.g. "v0.2.5") or null on failure.
+ * Fetch latest version from CDN buildVersion.json.
+ * Returns version string (e.g. "0.0.6") or null on failure.
  */
-function fetchLatestVersion() {
-  return new Promise((resolve) => {
-    const options = {
-      hostname: 'api.github.com',
-      path: '/repos/szmustang/ClawWork/releases/latest',
-      headers: { 'User-Agent': 'claude-code-desktop' },
-      timeout: 10000,
-    };
-    https.get(options, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        // GitHub may redirect — extract tag from redirect URL
-        // e.g. https://github.com/szmustang/ClawWork/releases/tag/v0.2.5
-        const match = res.headers.location.match(/\/tag\/(.+)$/);
-        res.resume();
-        return resolve(match ? match[1] : null);
-      }
-      if (res.statusCode !== 200) {
-        res.resume();
-        return resolve(null);
-      }
-      let data = '';
-      res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data);
-          resolve(json.tag_name || null);
-        } catch (_) {
-          resolve(null);
-        }
-      });
-    }).on('error', () => resolve(null))
-      .on('timeout', function() { this.destroy(); resolve(null); });
-  });
+async function fetchLatestVersion() {
+  const buildVersion = await fetchBuildVersion();
+  if (!buildVersion || !buildVersion.version) {
+    return null;
+  }
+  return buildVersion.version;
 }
 
 /**
