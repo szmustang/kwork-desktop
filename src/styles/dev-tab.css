@@ -1,0 +1,1365 @@
+/* ===== Dev Tab - OpenCode Desktop 风格布局 ===== */
+/* 左右分栏：左边会话管理侧栏 + 右边对话区 */
+
+.dt-container {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+/* =============================================
+   OpenCode Setup / 引导安装页
+   ============================================= */
+
+.dt-setup {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.dt-setup-card {
+  max-width: 420px;
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 48px 40px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.dt-setup-card h3 {
+  margin: 16px 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dt-setup-icon {
+  font-size: 48px;
+  line-height: 1;
+}
+
+.dt-setup-desc {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 8px 0 20px;
+}
+
+.dt-setup-error {
+  color: #f85149;
+  background: rgba(248, 81, 73, 0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.dt-setup-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary, #21262d);
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dt-setup-btn.primary {
+  background: #238636;
+  border-color: #2ea043;
+  color: #fff;
+}
+
+.dt-setup-btn.primary:hover {
+  background: #2ea043;
+}
+
+.dt-setup-hint {
+  color: var(--text-muted, #484f58);
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+/* Progress bar */
+.dt-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-tertiary, #21262d);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 16px 0 8px;
+}
+
+.dt-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #238636, #3fb950);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* Spinner */
+.dt-setup-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top-color: #58a6ff;
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: dt-spin 0.8s linear infinite;
+}
+
+@keyframes dt-spin {
+  to { transform: rotate(360deg); }
+}
+
+.dt-setup-icon-ok {
+  animation: dt-pop-in 0.4s ease;
+}
+
+@keyframes dt-pop-in {
+  0% { transform: scale(0.5); opacity: 0; }
+  70% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Connection loading in ChatArea */
+.dt-connection-loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-secondary);
+}
+
+.dt-connection-loading h3 {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* =============================================
+   左侧侧边栏
+   ============================================= */
+.dt-sidebar {
+  width: 240px;
+  min-width: 200px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* -- Sidebar top actions -- */
+.dt-sidebar-actions {
+  padding: 12px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dt-sidebar-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: left;
+}
+
+.dt-sidebar-action:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.dt-action-icon {
+  width: 18px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.dt-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* -- Filter toggle (任务/频道) -- */
+.dt-sidebar-filter {
+  display: flex;
+  margin: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.dt-filter-btn {
+  flex: 1;
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.dt-filter-btn:hover {
+  color: var(--text-secondary);
+}
+
+.dt-filter-btn.active {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* -- Sidebar section labels -- */
+.dt-sidebar-label {
+  padding: 12px 16px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* -- Session list -- */
+.dt-session-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px;
+}
+
+.dt-session-item {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.1s;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: ellipsis;
+  margin-bottom: 1px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.dt-session-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.dt-session-item.active {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  border-left: 3px solid var(--accent);
+}
+
+.dt-session-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 会话项 ··· 按钮 */
+.dt-session-more {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.dt-session-item:hover .dt-session-more,
+.dt-session-more[aria-expanded="true"] {
+  display: flex;
+}
+.dt-session-more:hover {
+  background: rgba(0,0,0,0.06);
+  color: var(--text-primary);
+}
+
+/* 会话操作下拉菜单 */
+.dt-session-menu {
+  position: absolute;
+  top: 100%;
+  right: 4px;
+  z-index: 100;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 0;
+  min-width: 160px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+.dt-session-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+.dt-session-menu-item:hover {
+  background: var(--bg-hover);
+}
+.dt-session-menu-item.danger {
+  color: #e5534b;
+}
+.dt-session-menu-item.danger:hover {
+  background: rgba(229,83,75,0.1);
+}
+.dt-menu-icon {
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+}
+
+.dt-session-empty {
+  padding: 16px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* -- Sidebar bottom user area -- */
+.dt-sidebar-bottom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.dt-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.dt-user-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dt-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dt-user-plan {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dt-settings-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.dt-settings-btn:hover {
+  color: var(--text-primary);
+}
+
+/* =============================================
+   右侧对话区
+   ============================================= */
+.dt-chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* -- Chat header -- */
+.dt-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+  min-height: 44px;
+}
+
+.dt-chat-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dt-chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.dt-chat-action {
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.dt-chat-action:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+/* -- Chat messages area -- */
+.dt-chat-messages {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* -- Connection error -- */
+.dt-connection-error {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 48px;
+}
+
+.dt-connection-error .dt-error-icon {
+  font-size: 48px;
+}
+
+.dt-connection-error h3 {
+  font-size: 18px;
+  color: var(--text-secondary);
+}
+
+.dt-connection-error p {
+  font-size: 14px;
+}
+
+.dt-connection-error code {
+  background: var(--bg-tertiary);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  color: var(--accent);
+  border: 1px solid var(--border-color);
+}
+
+/* =============================================
+   MessageTimeline 消息列表样式
+   参照 OpenCode Desktop session-turn / message-part
+   ============================================= */
+.dt-timeline {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.dt-timeline::-webkit-scrollbar {
+  display: none;
+}
+
+.dt-timeline-messages {
+  max-width: 860px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 16px 24px 48px;
+}
+
+.dt-timeline-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.dt-timeline-empty .dt-empty-icon { font-size: 48px; opacity: 0.4; }
+.dt-timeline-empty h3 { font-size: 18px; color: var(--text-secondary); font-weight: 600; }
+.dt-timeline-empty p { font-size: 14px; color: var(--text-muted); max-width: 400px; }
+
+/* -- Turn 轮次容器 -- */
+.dt-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* -- 消息分隔线 -- */
+.dt-message-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 24px 0;
+}
+
+/* ===== 用户消息（右对齐气泡）===== */
+.dt-user-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.dt-user-message-body {
+  width: fit-content;
+  max-width: min(82%, 64ch);
+  margin-left: auto;
+}
+
+.dt-user-message-text {
+  display: inline-block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+
+/* ===== Assistant 消息 ===== */
+.dt-assistant-message {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.dt-assistant-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.dt-assistant-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  background: var(--accent-dim);
+  flex-shrink: 0;
+}
+
+.dt-assistant-role {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.dt-assistant-time {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.dt-assistant-parts {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* ===== TextPart (Markdown 渲染) ===== */
+.dt-text-part {
+  width: 100%;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+/* Markdown 标题 */
+.dt-text-part h1,
+.dt-text-part h2,
+.dt-text-part h3,
+.dt-text-part h4,
+.dt-text-part h5,
+.dt-text-part h6 {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 16px 0 8px;
+  line-height: 1.4;
+}
+.dt-text-part h1 { font-size: 20px; }
+.dt-text-part h2 { font-size: 18px; }
+.dt-text-part h3 { font-size: 16px; }
+
+/* Markdown 段落 */
+.dt-text-part p {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dt-text-part p:last-child { margin-bottom: 0; }
+
+/* Markdown 列表 */
+.dt-text-part ul,
+.dt-text-part ol {
+  margin: 4px 0 8px;
+  padding-left: 24px;
+}
+
+.dt-text-part li { margin-bottom: 4px; }
+
+.dt-text-part li > p { margin: 0; }
+
+/* Markdown 引用 */
+.dt-text-part blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--accent);
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-radius: 0 4px 4px 0;
+}
+
+/* Markdown 分割线 */
+.dt-text-part hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 16px 0;
+}
+
+/* Markdown 粗体/斜体 */
+.dt-text-part strong { color: var(--text-primary); font-weight: 600; }
+.dt-text-part em { font-style: italic; }
+
+/* Markdown 链接 */
+.dt-text-part a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.dt-text-part a:hover { text-decoration: underline; }
+
+/* Markdown 表格 */
+.dt-text-part table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.dt-text-part th,
+.dt-text-part td {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.dt-text-part th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* 行内代码 */
+.dt-inline-code {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Fira Code', 'Menlo', monospace;
+  font-size: 0.9em;
+  color: var(--accent);
+}
+
+/* -- 代码块 -- */
+.dt-code-block {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin: 10px 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.dt-code-block .dt-code-lang {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.dt-code-block pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: 'SF Mono', 'Fira Code', 'Menlo', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.dt-code-block code { font-family: inherit; }
+
+.dt-code-block.streaming {
+  border-color: var(--accent);
+  border-style: dashed;
+}
+
+/* 带行号的代码块 */
+.dt-code-block.dt-numbered pre {
+  padding: 12px 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== ToolPart 工具卡片（参照 OpenCode BasicTool） ===== */
+.dt-tool-card {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  background: transparent;
+  transition: border-color 0.15s ease;
+}
+
+.dt-tool-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  width: 100%;
+  min-height: 36px;
+}
+
+.dt-tool-trigger[data-clickable='true'] {
+  cursor: pointer;
+}
+
+.dt-tool-trigger[data-clickable='true']:hover {
+  background: var(--bg-hover);
+}
+
+.dt-tool-card .dt-tool-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.dt-tool-card .dt-tool-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.dt-tool-card .dt-tool-subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.dt-tool-card .dt-tool-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: dt-spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes dt-spin {
+  to { transform: rotate(360deg); }
+}
+
+.dt-tool-chevron {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.dt-tool-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* 工具卡片 - 展开的内容 */
+.dt-tool-content {
+  border-top: 1px solid var(--border-color);
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.dt-tool-content::-webkit-scrollbar { display: none; }
+
+.dt-tool-output-pre {
+  margin: 0;
+  padding: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+}
+
+.dt-tool-error-content .dt-tool-output-pre {
+  color: var(--danger);
+}
+
+/* 工具卡片 - 折叠时的摘要 */
+.dt-tool-summary {
+  padding: 4px 12px 8px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dt-tool-error-summary {
+  color: var(--danger);
+}
+
+/* ===== ReasoningPart ===== */
+.dt-reasoning-part {
+  width: 100%;
+  border-left: 2px solid var(--border-color);
+  padding-left: 12px;
+  margin: 4px 0;
+}
+
+.dt-reasoning-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dt-reasoning-trigger:hover {
+  color: var(--text-secondary);
+}
+
+.dt-reasoning-icon { font-size: 14px; }
+
+.dt-reasoning-chevron {
+  font-size: 12px;
+  transition: transform 0.15s;
+}
+
+.dt-reasoning-chevron.open {
+  transform: rotate(180deg);
+}
+
+.dt-reasoning-content {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin-top: 8px;
+}
+
+/* ===== StepPart ===== */
+.dt-step-part {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+.dt-step-icon { font-size: 12px; }
+.dt-step-part.start .dt-step-icon { color: var(--accent); }
+.dt-step-part.finish .dt-step-icon { color: var(--success); }
+
+.dt-step-text { font-weight: 500; }
+
+/* ===== Thinking indicator ===== */
+.dt-thinking {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.dt-thinking-body {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px;
+  background: var(--card-bg, rgba(0,0,0,0.03));
+  border-radius: 12px;
+  width: fit-content;
+}
+
+.dt-thinking-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted, #8b949e);
+  animation: dt-bounce 1.4s ease-in-out infinite;
+}
+.dt-thinking-dot:nth-child(1) { animation-delay: 0s; }
+.dt-thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+.dt-thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dt-bounce {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.1); }
+}
+
+/* =============================================
+   PromptInput 输入区
+   ============================================= */
+.dt-prompt-area {
+  padding: 12px 24px 20px;
+  flex-shrink: 0;
+}
+
+.dt-prompt-wrapper {
+  max-width: 860px;
+  margin: 0 auto;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  transition: border-color 0.2s;
+}
+
+.dt-prompt-wrapper:focus-within {
+  border-color: var(--accent);
+}
+
+.dt-prompt-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  padding: 14px 16px 6px;
+  line-height: 1.5;
+}
+
+.dt-prompt-input::placeholder {
+  color: var(--text-muted);
+}
+
+.dt-prompt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+
+.dt-prompt-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dt-prompt-attach {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.12s;
+}
+
+.dt-prompt-attach:hover {
+  border-color: var(--text-secondary);
+  color: var(--text-primary);
+}
+
+/* --- Agent switcher --- */
+.dt-agent-switcher {
+  display: flex;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dt-agent-btn {
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-weight: 500;
+}
+
+.dt-agent-btn:hover {
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.dt-agent-btn.active {
+  background: var(--accent-color, #7c5cfc);
+  color: #fff;
+}
+
+.dt-agent-btn + .dt-agent-btn {
+  border-left: 1px solid var(--border-color);
+}
+
+/* --- Model selector --- */
+.dt-model-selector {
+  position: relative;
+}
+
+.dt-model-btn {
+  gap: 5px;
+  max-width: 200px;
+}
+
+.dt-model-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.dt-model-dropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  min-width: 240px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  padding: 6px;
+  z-index: 100;
+}
+
+.dt-model-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.dt-model-option:hover {
+  background: var(--bg-hover);
+}
+
+.dt-model-option.active {
+  background: rgba(124, 77, 255, 0.15);
+}
+
+.dt-model-option-name {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.dt-model-option.active .dt-model-option-name {
+  color: var(--accent);
+}
+
+.dt-model-option-provider {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+.dt-agent-switch {
+  display: flex;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.dt-agent-btn {
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.dt-agent-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.dt-prompt-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dt-prompt-send {
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.dt-prompt-send:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: scale(1.05);
+}
+
+.dt-prompt-send:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.dt-prompt-stop {
+  padding: 6px 14px;
+  border: 1px solid var(--danger);
+  background: rgba(239, 83, 80, 0.1);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* =============================================
+   Dialogs 弹窗
+   ============================================= */
+.dt-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dt-dialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  width: 420px;
+  max-width: 90vw;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+}
+
+.dt-dialog-header {
+  padding: 16px 20px 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.dt-dialog-body {
+  padding: 16px 20px;
+}
+
+.dt-dialog-body p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.dt-dialog-field {
+  margin-bottom: 12px;
+}
+
+.dt-dialog-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.dt-dialog-field input,
+.dt-dialog-field select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+}
+
+.dt-dialog-field input:focus,
+.dt-dialog-field select:focus {
+  border-color: var(--accent);
+}
+
+.dt-dialog-confirm {
+  display: flex;
+  gap: 8px;
+}
+
+.dt-dialog-confirm button {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.dt-dialog-confirm button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.dt-dialog-tool-info {
+  margin-top: 8px;
+}
+
+.dt-muted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dt-dialog-footer {
+  padding: 12px 20px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dt-dialog-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dt-dialog-btn.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.dt-dialog-btn.primary:hover {
+  background: var(--accent-hover);
+}
+
+.dt-dialog-btn.secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.dt-dialog-btn.secondary:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- White rounded background -->
+  <rect width="1024" height="1024" rx="180" ry="180" fill="#ffffff"/>
+  
+  <!-- Kingdee four dots logo mark - centered -->
+  <!-- Large blue circle (top) -->
+  <circle cx="560" cy="300" r="165" fill="#4196FC"/>
+  
+  <!-- Cyan circle (left) -->
+  <circle cx="320" cy="490" r="115" fill="#50E6DC"/>
+  
+  <!-- Teal/green circle (center-right) -->
+  <circle cx="540" cy="560" r="130" fill="#5CC8B0"/>
+  
+  <!-- Purple circle (bottom-center) -->
+  <circle cx="460" cy="760" r="72" fill="#A070D8"/>
+</svg>
