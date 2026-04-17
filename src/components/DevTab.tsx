@@ -83,37 +83,35 @@ function OpenCodeWebview({ serverUrl }: { serverUrl: string }) {
 }
 
 export default function DevTab({ setup }: { setup: OpenCodeSetupResult }) {
-  // 未就绪时显示引导页
-  if (setup.state.status !== 'ready') {
+  const { status, serverUrl } = setup.state
+
+  // 未安装 / 出错 → 显示提示
+  if (status === 'not-installed' || status === 'error') {
     return (
       <div className="dt-container">
         <OpenCodeSetup
           state={setup.state}
-          onInstall={setup.install}
           onRetry={setup.retry}
         />
       </div>
     )
   }
 
-  // 就绪后用 webview 嵌入 opencode Web UI
-  const serverUrl = setup.state.serverUrl
-  if (!serverUrl) {
-    // serverUrl 尚未就绪，继续显示 loading
+  // 就绪且有 serverUrl → 加载 webview
+  if (status === 'ready' && serverUrl) {
     return (
-      <div className="dt-container">
-        <div className="dt-setup">
-          <div className="dt-setup-card">
-            <div className="dt-setup-spinner" />
-            <h3>正在连接 Kingdee Code 服务...</h3>
-          </div>
-        </div>
+      <div className="dt-container" style={{ display: 'flex', flexDirection: 'column' }}>
+        <OpenCodeWebview serverUrl={serverUrl} />
       </div>
     )
   }
+
+  // 其他情况（checking / starting / ready但无url）→ 统一显示一个简洁 spinner
   return (
-    <div className="dt-container" style={{ display: 'flex', flexDirection: 'column' }}>
-      <OpenCodeWebview serverUrl={serverUrl} />
+    <div className="dt-container">
+      <div className="dt-setup">
+        <div className="dt-setup-spinner" />
+      </div>
     </div>
   )
 }

@@ -1,9 +1,9 @@
 const { spawn, execFile } = require('child_process');
 const http = require('http');
-const https = require('https');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 
 let sidecarProcess = null;
 let cachedServerInfo = null;
@@ -11,22 +11,32 @@ const childPids = new Set(); // track all spawned child PIDs for cleanup
 
 const KCODE_DIR = path.join(process.env.HOME || os.homedir(), '.kcode');
 const SERVER_JSON_PATH = path.join(KCODE_DIR, 'server.json');
+const UPDATES_DIR = path.join(KCODE_DIR, 'updates');
+const UPDATE_PENDING_PATH = path.join(UPDATES_DIR, 'update-pending.json');
 
 /* ── Paths ── */
 
 function getAppBinDir() {
-  // In production: resources/bin/  In dev: electron/bin/
   const isDev = !!process.env.VITE_DEV_SERVER_URL;
   if (isDev) {
     return path.join(__dirname, 'bin');
   }
-  return path.join(process.resourcesPath, 'bin');
+  // Production: use persistent writable path outside .app bundle
+  // .app/Contents/Resources is read-only (code signing / App Translocation)
+  const binDir = path.join(KCODE_DIR, 'bin');
+  fs.mkdirSync(binDir, { recursive: true });
+  return binDir;
 }
 
 function getAppDataDir() {
-  // Data dir alongside bin dir: electron/data/ or resources/data/
-  const binDir = getAppBinDir();
-  const dataDir = path.join(path.dirname(binDir), 'data');
+  const isDev = !!process.env.VITE_DEV_SERVER_URL;
+  if (isDev) {
+    const dataDir = path.join(__dirname, 'data');
+    fs.mkdirSync(dataDir, { recursive: true });
+    return dataDir;
+  }
+  // Production: use persistent writable path under ~/.kcode/data
+  const dataDir = path.join(KCODE_DIR, 'data');
   fs.mkdirSync(dataDir, { recursive: true });
   return dataDir;
 }
@@ -37,9 +47,38 @@ function getOpencodeBinPath() {
   return path.join(binDir, exe);
 }
 
+/**
+ * In production, if ~/.kcode/bin/opencode doesn't exist but the app bundle
+ * ships one in resources/bin/, copy it over so the first launch works offline.
+ */
+function seedBundledBinary() {
+  const isDev = !!process.env.VITE_DEV_SERVER_URL;
+  if (isDev) return; // dev mode uses electron/bin directly
+
+  const exe = process.platform === 'win32' ? 'opencode.exe' : 'opencode';
+  const dest = path.join(KCODE_DIR, 'bin', exe);
+  if (fs.existsSync(dest)) return; // already installed, skip
+
+  // electron-builder extraResources lands in <app>/Contents/Resources/bin/
+  const bundled = path.join(process.resourcesPath, 'bin', exe);
+  if (!fs.existsSync(bundled)) {
+    console.log('[Sidecar] No bundled binary found at', bundled);
+    return;
+  }
+
+  console.log('[Sidecar] Seeding bundled opencode from', bundled, 'to', dest);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.copyFileSync(bundled, dest);
+  if (process.platform !== 'win32') {
+    fs.chmodSync(dest, 0o755);
+  }
+  console.log('[Sidecar] Bundled opencode copied successfully');
+}
+
 /* ── Check if opencode is installed ── */
 
 function isOpencodeInstalled() {
+  seedBundledBinary(); // ensure bundled binary is copied on first launch
   const binPath = getOpencodeBinPath();
   return fs.existsSync(binPath);
 }
@@ -56,82 +95,7 @@ function getOpencodeVersion() {
   });
 }
 
-/* ── Download & Install ── */
-
-const CDN_BASE_URL = 'http://tdmrxr8op.hn-bkt.clouddn.com';
-const BUILD_VERSION_URL = `${CDN_BASE_URL}/buildVersion.json`;
-
-/**
- * Fetch buildVersion.json from CDN.
- * Returns { version, fileName } or null on failure.
- */
-function fetchBuildVersion() {
-  return new Promise((resolve) => {
-    const httpModule = BUILD_VERSION_URL.startsWith('https') ? https : http;
-    httpModule.get(BUILD_VERSION_URL, { headers: { 'User-Agent': 'kwork-desktop' }, timeout: 10000 }, (res) => {
-      if (res.statusCode !== 200) {
-        res.resume();
-        return resolve(null);
-      }
-      let data = '';
-      res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data);
-          resolve(json);
-        } catch (_) {
-          resolve(null);
-        }
-      });
-    }).on('error', () => resolve(null))
-      .on('timeout', function() { this.destroy(); resolve(null); });
-  });
-}
-
-/**
- * Get download URL from CDN based on buildVersion.json.
- * Returns { url, fileName } or throws on failure.
- */
-async function getDownloadInfo() {
-  const buildVersion = await fetchBuildVersion();
-  if (!buildVersion || !buildVersion.fileName) {
-    throw new Error('Failed to fetch buildVersion.json from CDN');
-  }
-  return {
-    url: `${CDN_BASE_URL}/${buildVersion.fileName}`,
-    fileName: buildVersion.fileName,
-  };
-}
-
-function downloadFile(url, destPath, onProgress) {
-  return new Promise((resolve, reject) => {
-    const follow = (u) => {
-      const httpModule = u.startsWith('https') ? https : http;
-      httpModule.get(u, { headers: { 'User-Agent': 'kwork-desktop' } }, (res) => {
-        // Handle redirects
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          return follow(res.headers.location);
-        }
-        if (res.statusCode !== 200) {
-          return reject(new Error(`Download failed: HTTP ${res.statusCode}`));
-        }
-        const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
-        let downloaded = 0;
-        const fileStream = fs.createWriteStream(destPath);
-        res.on('data', (chunk) => {
-          downloaded += chunk.length;
-          if (onProgress && totalBytes > 0) {
-            onProgress({ downloaded, totalBytes, percent: Math.round((downloaded / totalBytes) * 100) });
-          }
-        });
-        res.pipe(fileStream);
-        fileStream.on('finish', () => { fileStream.close(); resolve(); });
-        fileStream.on('error', reject);
-      }).on('error', reject);
-    };
-    follow(url);
-  });
-}
+/* ── Archive Utilities ── */
 
 function extractArchive(archivePath, destDir) {
   return new Promise((resolve, reject) => {
@@ -155,50 +119,6 @@ function extractArchive(archivePath, destDir) {
   });
 }
 
-async function installOpencode(onProgress) {
-  const binDir = getAppBinDir();
-  fs.mkdirSync(binDir, { recursive: true });
-
-  const downloadInfo = await getDownloadInfo();
-  const url = downloadInfo.url;
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-'));
-  const archiveName = downloadInfo.fileName;
-  const zipPath = path.join(tmpDir, archiveName);
-
-  try {
-    // Step 1: Download
-    if (onProgress) onProgress({ stage: 'downloading', percent: 0 });
-    await downloadFile(url, zipPath, (p) => {
-      if (onProgress) onProgress({ stage: 'downloading', ...p });
-    });
-
-    // Step 2: Unzip
-    if (onProgress) onProgress({ stage: 'extracting', percent: 0 });
-    await extractArchive(zipPath, tmpDir);
-
-    // Step 3: Find the opencode binary in extracted files and copy to binDir
-    if (onProgress) onProgress({ stage: 'installing', percent: 50 });
-    const exeName = process.platform === 'win32' ? 'opencode.exe' : 'opencode';
-    const extracted = findFile(tmpDir, exeName);
-    if (!extracted) {
-      throw new Error('opencode binary not found in archive');
-    }
-    const destBin = path.join(binDir, exeName);
-    fs.copyFileSync(extracted, destBin);
-
-    // Step 4: Make executable (unix)
-    if (process.platform !== 'win32') {
-      fs.chmodSync(destBin, 0o755);
-    }
-
-    if (onProgress) onProgress({ stage: 'done', percent: 100 });
-    return true;
-  } finally {
-    // Cleanup temp
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  }
-}
-
 function findFile(dir, name) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
@@ -212,23 +132,10 @@ function findFile(dir, name) {
   return null;
 }
 
-/* ── Update Check ── */
+/* ── Pending Update (written by opencode, applied by shell) ── */
 
 /**
- * Fetch latest version from CDN buildVersion.json.
- * Returns version string (e.g. "0.0.6") or null on failure.
- */
-async function fetchLatestVersion() {
-  const buildVersion = await fetchBuildVersion();
-  if (!buildVersion || !buildVersion.version) {
-    return null;
-  }
-  return buildVersion.version;
-}
-
-/**
- * Normalize version string for comparison.
- * Strips leading 'v' and returns comparable string.
+ * Normalize version string: strip leading 'v', trim whitespace.
  */
 function normalizeVersion(v) {
   if (!v) return '';
@@ -236,50 +143,152 @@ function normalizeVersion(v) {
 }
 
 /**
- * Check if a newer version is available.
- * Returns { hasUpdate, currentVersion, latestVersion } 
+ * Compare two semver-like version strings.
+ * Returns  1 if a > b, -1 if a < b, 0 if equal.
  */
-async function checkForUpdate() {
-  const currentRaw = await getOpencodeVersion();
-  const latestRaw = await fetchLatestVersion();
-  
-  console.log('[Sidecar] Version check: current =', currentRaw, ', latest =', latestRaw);
-  
-  if (!currentRaw || !latestRaw) {
-    return { hasUpdate: false, currentVersion: currentRaw, latestVersion: latestRaw };
+function compareVersions(a, b) {
+  const pa = normalizeVersion(a).split('.').map(Number);
+  const pb = normalizeVersion(b).split('.').map(Number);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na > nb) return 1;
+    if (na < nb) return -1;
   }
-  
-  const current = normalizeVersion(currentRaw);
-  const latest = normalizeVersion(latestRaw);
-  
-  // Simple string comparison — works for semver if format is consistent
-  const hasUpdate = latest !== current && latest > current;
-  return { hasUpdate, currentVersion: currentRaw, latestVersion: latestRaw };
+  return 0;
 }
 
 /**
- * Update opencode binary to latest version.
- * Kills running sidecar first, then downloads and replaces.
+ * Compute SHA256 hex digest of a file.
  */
-async function updateOpencode(onProgress) {
-  // Kill running sidecar before replacing binary
-  killSidecar();
-  
-  // Also kill any externally running process from server.json
-  const serverJson = readServerJson();
-  if (serverJson && serverJson.pid) {
-    try {
-      process.kill(serverJson.pid, 'SIGTERM');
-      console.log('[Sidecar] Killed running server pid', serverJson.pid, 'for update');
-    } catch (_) { /* already dead */ }
+function sha256File(filePath) {
+  const data = fs.readFileSync(filePath);
+  return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+/**
+ * Apply a pending update if update-pending.json exists and contains
+ * a version newer than the currently installed opencode binary.
+ *
+ * Flow (per host-integration.md §5.3):
+ *  1. Read ~/.kcode/updates/update-pending.json
+ *  2. Get current local version via  opencode --version
+ *  3. If pending version > local version:
+ *     a. SHA256 verify the downloaded archive
+ *     b. Extract → replace ~/.kcode/bin/opencode
+ *     c. Clean up pending marker & download dir
+ *  4. Otherwise skip (pending version <= local) and clean up stale marker
+ */
+async function applyPendingUpdate() {
+  // 1. Check existence
+  if (!fs.existsSync(UPDATE_PENDING_PATH)) {
+    console.log('[Sidecar] No pending update');
+    return { applied: false };
   }
-  cachedServerInfo = null;
-  
-  // Wait a moment for process to exit
-  await new Promise(r => setTimeout(r, 500));
-  
-  // Reuse installOpencode to download and replace
-  return installOpencode(onProgress);
+
+  // 2. Parse
+  let pending;
+  try {
+    pending = JSON.parse(fs.readFileSync(UPDATE_PENDING_PATH, 'utf-8'));
+  } catch (err) {
+    console.error('[Sidecar] Bad update-pending.json:', err.message);
+    cleanupPendingUpdate();
+    return { applied: false, error: 'parse_error' };
+  }
+
+  const { version: pendingVer, binary, sha256, forced } = pending;
+  console.log('[Sidecar] Pending update v' + pendingVer, '| binary:', binary, '| forced:', forced);
+
+  // 3. Compare with local version
+  const currentVer = await getOpencodeVersion();
+  if (currentVer && compareVersions(pendingVer, currentVer) <= 0) {
+    console.log('[Sidecar] Pending v' + pendingVer, '<= local v' + currentVer + ', skipping');
+    cleanupPendingUpdate();
+    return { applied: false, reason: 'not_newer' };
+  }
+  console.log('[Sidecar] Updating: local v' + (currentVer || 'unknown'), '→ v' + pendingVer);
+
+  // 4. Verify archive exists
+  if (!binary || !fs.existsSync(binary)) {
+    console.error('[Sidecar] Archive not found:', binary);
+    cleanupPendingUpdate();
+    return { applied: false, error: 'archive_missing' };
+  }
+
+  // 5. SHA256 verification
+  if (sha256) {
+    const computed = sha256File(binary);
+    if (computed !== sha256.toLowerCase()) {
+      console.error('[Sidecar] SHA256 mismatch! expected:', sha256, 'got:', computed);
+      cleanupPendingUpdate();
+      return { applied: false, error: 'sha256_mismatch' };
+    }
+    console.log('[Sidecar] SHA256 OK');
+  }
+
+  // 6. Extract and replace
+  const binDir = getAppBinDir();
+  const exeName = process.platform === 'win32' ? 'opencode.exe' : 'opencode';
+  const destBin = path.join(binDir, exeName);
+  const backupPath = destBin + '.bak';
+
+  // Backup old binary
+  try {
+    if (fs.existsSync(destBin)) {
+      fs.copyFileSync(destBin, backupPath);
+    }
+  } catch (err) {
+    console.warn('[Sidecar] Backup failed:', err.message);
+  }
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-update-'));
+  try {
+    await extractArchive(binary, tmpDir);
+    const extracted = findFile(tmpDir, exeName);
+    if (!extracted) throw new Error('opencode binary not found in archive');
+
+    fs.copyFileSync(extracted, destBin);
+    if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
+
+    console.log('[Sidecar] Updated opencode to v' + pendingVer);
+    cleanupPendingUpdate();
+    try { fs.unlinkSync(backupPath); } catch (_) {}
+    return { applied: true, version: pendingVer };
+  } catch (err) {
+    console.error('[Sidecar] Update failed:', err.message);
+    // Rollback
+    try {
+      if (fs.existsSync(backupPath)) {
+        fs.copyFileSync(backupPath, destBin);
+        if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
+        console.log('[Sidecar] Rolled back to previous binary');
+      }
+    } catch (rbErr) {
+      console.error('[Sidecar] Rollback failed:', rbErr.message);
+    }
+    cleanupPendingUpdate();
+    return { applied: false, error: 'extract_failed' };
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Remove update-pending.json and clean download directory.
+ */
+function cleanupPendingUpdate() {
+  try {
+    if (fs.existsSync(UPDATE_PENDING_PATH)) fs.unlinkSync(UPDATE_PENDING_PATH);
+  } catch (err) {
+    console.warn('[Sidecar] Failed to remove update-pending.json:', err.message);
+  }
+  const dlDir = path.join(UPDATES_DIR, 'download');
+  try {
+    if (fs.existsSync(dlDir)) fs.rmSync(dlDir, { recursive: true, force: true });
+  } catch (err) {
+    console.warn('[Sidecar] Failed to clean download dir:', err.message);
+  }
 }
 
 /* ── Server Info & Health ── */
@@ -383,6 +392,16 @@ async function waitForServerJson(maxRetries = 30, interval = 1000) {
 
 async function startSidecar() {
   if (sidecarProcess) return getServerInfo();
+
+  // Apply pending update before launching (opencode writes update-pending.json)
+  try {
+    const updateResult = await applyPendingUpdate();
+    if (updateResult.applied) {
+      console.log('[Sidecar] Applied pending update to v' + updateResult.version);
+    }
+  } catch (err) {
+    console.warn('[Sidecar] applyPendingUpdate error (continuing):', err.message);
+  }
 
   // Check if already running via server.json
   cachedServerInfo = null; // force re-read
@@ -539,8 +558,6 @@ module.exports = {
   getServerInfo,
   isOpencodeInstalled,
   getOpencodeVersion,
-  installOpencode,
-  checkForUpdate,
-  updateOpencode,
+  applyPendingUpdate,
   getAppBinDir,
 };

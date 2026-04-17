@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, Component, type ReactNode, type ErrorInfo } from 'react'
+import { useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
 import ChatTab from './components/ChatTab'
 import WorkTab from './components/WorkTab'
 import DevTab from './components/DevTab'
@@ -31,112 +31,6 @@ const tabs: { key: TabKey; label: string }[] = [
   { key: 'work', label: '工作' },
   { key: 'dev', label: '开发' },
 ]
-
-/* ── 右下角更新提示弹窗 ── */
-
-const UPDATE_CHECK_INTERVAL = 15 * 60 * 1000 // 15 分钟
-
-function UpdateToast() {
-  const [updateInfo, setUpdateInfo] = useState<{ latestVersion: string } | null>(null)
-  const [updating, setUpdating] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const dismissed = useRef(false)
-
-  const checkUpdate = useCallback(async () => {
-    if (dismissed.current || updating) return
-    const api = (window as any).electronAPI
-    if (!api?.checkUpdate) return
-
-    try {
-      const result = await api.checkUpdate()
-      console.log('[UpdateToast] check result:', JSON.stringify(result))
-      if (result.hasUpdate && result.latestVersion) {
-        setUpdateInfo({ latestVersion: result.latestVersion })
-      }
-    } catch (err) {
-      console.warn('[UpdateToast] check failed:', err)
-    }
-  }, [updating])
-
-  useEffect(() => {
-    // 首次延迟 2 分钟后检查（避免与启动时检查冲突）
-    const initialTimer = setTimeout(checkUpdate, 2 * 60 * 1000)
-    // 之后每 15 分钟检查一次
-    const interval = setInterval(checkUpdate, UPDATE_CHECK_INTERVAL)
-    return () => {
-      clearTimeout(initialTimer)
-      clearInterval(interval)
-    }
-  }, [checkUpdate])
-
-  const handleUpdate = async () => {
-    const api = (window as any).electronAPI
-    if (!api) return
-
-    setUpdating(true)
-    setProgress(0)
-
-    // 监听下载进度
-    const removeListener = api.onInstallProgress?.((p: any) => {
-      if (p.stage === 'downloading' && p.percent) {
-        setProgress(p.percent)
-      }
-    })
-
-    try {
-      const result = await api.updateOpencode()
-      if (removeListener) removeListener()
-
-      if (result.success) {
-        // 更新成功，重启应用
-        api.relaunchApp()
-      } else {
-        console.error('[UpdateToast] update failed:', result.error)
-        setUpdating(false)
-        setUpdateInfo(null)
-      }
-    } catch (err) {
-      if (removeListener) removeListener()
-      console.error('[UpdateToast] update error:', err)
-      setUpdating(false)
-      setUpdateInfo(null)
-    }
-  }
-
-  const handleDismiss = () => {
-    dismissed.current = true
-    setUpdateInfo(null)
-  }
-
-  if (!updateInfo) return null
-
-  return (
-    <div className="update-toast">
-      <div className="update-toast-content">
-        <div className="update-toast-icon">⬆️</div>
-        <div className="update-toast-text">
-          <strong>发现新版本 {updateInfo.latestVersion}</strong>
-          {updating ? (
-            <div className="update-toast-progress">
-              <div className="update-toast-progress-bar">
-                <div className="update-toast-progress-fill" style={{ width: `${progress}%` }} />
-              </div>
-              <span className="update-toast-percent">{progress}%</span>
-            </div>
-          ) : (
-            <p>Kingdee Code 有新版本可用，是否立即更新？</p>
-          )}
-        </div>
-      </div>
-      {!updating && (
-        <div className="update-toast-actions">
-          <button className="update-toast-btn primary" onClick={handleUpdate}>立即更新</button>
-          <button className="update-toast-btn" onClick={handleDismiss}>稍后再说</button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 /* ── App ── */
 
@@ -216,9 +110,6 @@ function App() {
           </div>
         </ErrorBoundary>
       </main>
-
-      {/* 右下角更新提示 */}
-      <UpdateToast />
     </div>
   )
 }
