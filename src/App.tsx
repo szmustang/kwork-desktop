@@ -158,9 +158,7 @@ function App() {
     <div className="app">
       {/* 顶部导航栏 */}
       <header className="topbar">
-        <div className="topbar-left">
-          <span className="logo-text">Kingdee KWork</span>
-        </div>
+        <div className="topbar-left" />
 
         <nav className="topbar-tabs">
           {tabs.map((tab) => (

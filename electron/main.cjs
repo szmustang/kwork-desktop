@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeTheme } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage } = require('electron');
 const path = require('path');
 const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion, installOpencode, checkForUpdate, updateOpencode } = require('./sidecar.cjs');
 
@@ -6,12 +6,13 @@ const devServerURL = process.env.VITE_DEV_SERVER_URL;
 
 function createWindow() {
   const win = new BrowserWindow({
-    title: 'Kingdee KWork',
+    title: '',
     width: 1200,
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 12, y: 12 },
     backgroundColor: '#ffffff',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -119,11 +120,44 @@ ipcMain.handle('relaunch-app', () => {
   app.exit(0);
 });
 
+// 设置应用名称
+app.name = 'Kingdee KWork';
+
 // 强制 Chromium 使用亮色模式，影响 webview 中 prefers-color-scheme 媒体查询
 // 主窗口使用硬编码暗色样式，不受此设置影响
 nativeTheme.themeSource = 'light';
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  // 自定义菜单，使 macOS 菜单栏显示正确的应用名称（必须在 app ready 之后）
+  const appName = 'Kingdee KWork';
+  if (process.platform === 'darwin') {
+    const template = [
+      {
+        label: appName,
+        submenu: [
+          { role: 'about', label: `About ${appName}` },
+          { type: 'separator' },
+          { role: 'services' },
+          { type: 'separator' },
+          { role: 'hide', label: `Hide ${appName}` },
+          { role: 'hideOthers' },
+          { role: 'unhide' },
+          { type: 'separator' },
+          { role: 'quit', label: `Quit ${appName}` },
+        ],
+      },
+      { role: 'fileMenu' },
+      { role: 'editMenu' },
+      { role: 'viewMenu' },
+      { role: 'windowMenu' },
+    ];
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    // 设置 Dock 图标（macOS squircle 规范图标）
+    const iconPath = path.join(__dirname, '../build/icon-macos.png');
+    app.dock.setIcon(iconPath);
+  }
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   killSidecar();
