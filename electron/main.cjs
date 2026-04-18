@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog } = require('electron');
 const path = require('path');
-const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion } = require('./sidecar.cjs');
+const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion, checkPendingUpdate } = require('./sidecar.cjs');
 
 const devServerURL = process.env.VITE_DEV_SERVER_URL;
 
@@ -82,6 +82,16 @@ ipcMain.handle('check-opencode', () => {
 ipcMain.handle('get-opencode-version', async () => {
   const version = await getOpencodeVersion();
   return { version };
+});
+
+// Check if there's a pending update
+ipcMain.handle('check-pending-update', async () => {
+  try {
+    const result = await checkPendingUpdate();
+    return result;
+  } catch (err) {
+    return { hasUpdate: false, error: err.message };
+  }
 });
 
 // install-opencode and update-opencode removed:

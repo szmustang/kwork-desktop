@@ -291,6 +291,36 @@ function cleanupPendingUpdate() {
   }
 }
 
+/**
+ * Check if there's a pending update available.
+ * Returns { hasUpdate: boolean, version?: string, currentVersion?: string }
+ */
+async function checkPendingUpdate() {
+  // 1. Check existence
+  if (!fs.existsSync(UPDATE_PENDING_PATH)) {
+    return { hasUpdate: false };
+  }
+
+  // 2. Parse
+  let pending;
+  try {
+    pending = JSON.parse(fs.readFileSync(UPDATE_PENDING_PATH, 'utf-8'));
+  } catch (err) {
+    console.error('[Sidecar] Bad update-pending.json:', err.message);
+    return { hasUpdate: false, error: 'parse_error' };
+  }
+
+  const { version: pendingVer } = pending;
+  
+  // 3. Compare with local version
+  const currentVer = await getOpencodeVersion();
+  if (currentVer && compareVersions(pendingVer, currentVer) <= 0) {
+    return { hasUpdate: false, version: pendingVer, currentVersion: currentVer };
+  }
+  
+  return { hasUpdate: true, version: pendingVer, currentVersion: currentVer };
+}
+
 /* ── Server Info & Health ── */
 
 /**
@@ -559,5 +589,6 @@ module.exports = {
   isOpencodeInstalled,
   getOpencodeVersion,
   applyPendingUpdate,
+  checkPendingUpdate,
   getAppBinDir,
 };

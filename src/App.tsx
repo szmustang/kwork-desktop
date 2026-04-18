@@ -1,4 +1,4 @@
-import { useState, useEffect, Component, type ReactNode, type ErrorInfo } from 'react'
+import { useState, useEffect, useCallback, useRef, Component, type ReactNode, type ErrorInfo } from 'react'
 import ChatTab from './components/ChatTab'
 import WorkTab from './components/WorkTab'
 import DevTab from './components/DevTab'
@@ -31,6 +31,72 @@ const tabs: { key: TabKey; label: string }[] = [
   { key: 'work', label: '工作' },
   { key: 'dev', label: '开发' },
 ]
+
+/* ── 右下角更新提示弹窗 ── */
+
+const UPDATE_CHECK_INTERVAL = 30 * 60 * 1000 // 30 分钟
+
+function UpdateToast() {
+  const [updateInfo, setUpdateInfo] = useState<{ version: string } | null>(null)
+
+  const checkUpdate = useCallback(async () => {
+    const api = (window as any).electronAPI
+    if (!api?.checkPendingUpdate) return
+
+    try {
+      const result = await api.checkPendingUpdate()
+      console.log('[UpdateToast] check result:', JSON.stringify(result))
+      // 每 30 分钟都检查，但只有弹窗未显示时才弹出
+      if (result.hasUpdate && result.version && !updateInfo) {
+        setUpdateInfo({ version: result.version })
+      }
+    } catch (err) {
+      console.warn('[UpdateToast] check failed:', err)
+    }
+  }, [updateInfo])
+
+  useEffect(() => {
+    // 首次延迟 30 分钟后检查
+    const initialTimer = setTimeout(checkUpdate, UPDATE_CHECK_INTERVAL)
+    // 之后每 30 分钟检查一次
+    const interval = setInterval(checkUpdate, UPDATE_CHECK_INTERVAL)
+    return () => {
+      clearTimeout(initialTimer)
+      clearInterval(interval)
+    }
+  }, [checkUpdate])
+
+  const handleUpdate = () => {
+    const api = (window as any).electronAPI
+    if (!api) return
+    
+    // 重启应用以应用更新
+    api.relaunchApp()
+  }
+
+  const handleDismiss = () => {
+    // 只关闭弹窗，不清除状态，30 分钟后检查时会自动再次弹出
+    setUpdateInfo(null)
+  }
+
+  if (!updateInfo) return null
+
+  return (
+    <div className="update-toast">
+      <div className="update-toast-content">
+        <div className="update-toast-icon">⬆️</div>
+        <div className="update-toast-text">
+          <strong>发现新版本 Build {updateInfo.version}</strong>
+          <p>Kingdee Code 有新版本可用，是否立即更新？</p>
+        </div>
+      </div>
+      <div className="update-toast-actions">
+        <button className="update-toast-btn primary" onClick={handleUpdate}>立即更新</button>
+        <button className="update-toast-btn" onClick={handleDismiss}>稍后再说</button>
+      </div>
+    </div>
+  )
+}
 
 /* ── App ── */
 
@@ -110,6 +176,9 @@ function App() {
           </div>
         </ErrorBoundary>
       </main>
+
+      {/* 右下角更新提示 */}
+      <UpdateToast />
     </div>
   )
 }
