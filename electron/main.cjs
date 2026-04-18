@@ -168,11 +168,10 @@ app.whenReady().then(() => {
       { role: 'windowMenu' },
     ];
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
-    // 设置 Dock 图标（macOS squircle 规范图标）
-    const iconPath = path.join(__dirname, '../build/icon-macos.png');
-    app.dock.setIcon(iconPath);
   }
   createWindow();
+}).catch((err) => {
+  console.error('[main] whenReady failed:', err);
 });
 
 app.on('window-all-closed', () => {
