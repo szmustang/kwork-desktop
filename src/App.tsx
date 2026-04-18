@@ -34,44 +34,137 @@ const tabs: { key: TabKey; label: string }[] = [
 
 /* ── 右下角更新提示弹窗 ── */
 
-const UPDATE_CHECK_INTERVAL = 30 * 60 * 1000 // 30 分钟
+const OPENCODE_CHECK_INTERVAL = 30 * 60 * 1000    // opencode: 30 分钟
+const CLIENT_CHECK_INTERVAL = 60 * 60 * 1000      // 客户端: 1 小时
+const OPENCODE_CHECK_DELAY = 5 * 60 * 1000        // opencode 首次检测延迟: 5 分钟
+const CLIENT_CHECK_DELAY = 1 * 60 * 1000          // 客户端首次检测延迟: 1 分钟（测试用）
 
 function UpdateToast() {
-  const [updateInfo, setUpdateInfo] = useState<{ version: string } | null>(null)
+  const [updateInfo, setUpdateInfo] = useState<{ version: string; type: 'opencode' | 'client' } | null>(null)
+  const [downloading, setDownloading] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState(0)
+  const relaunchingRef = useRef(false)  // 标记是否正在重启安装，防止 error 事件干扰
 
-  const checkUpdate = useCallback(async () => {
+  // 检查 opencode 更新
+  const checkOpencodeUpdate = useCallback(async () => {
     const api = (window as any).electronAPI
     if (!api?.checkPendingUpdate) return
 
     try {
       const result = await api.checkPendingUpdate()
-      console.log('[UpdateToast] check result:', JSON.stringify(result))
-      // 每 30 分钟都检查，但只有弹窗未显示时才弹出
+      console.log('[UpdateToast] opencode check result:', JSON.stringify(result))
       if (result.hasUpdate && result.version && !updateInfo) {
-        setUpdateInfo({ version: result.version })
+        setUpdateInfo({ version: result.version, type: 'opencode' })
       }
     } catch (err) {
-      console.warn('[UpdateToast] check failed:', err)
+      console.warn('[UpdateToast] opencode check failed:', err)
+    }
+  }, [updateInfo])
+
+  // 检查客户端更新
+  const checkClientUpdate = useCallback(async () => {
+    const api = (window as any).electronAPI
+    if (!api?.checkForClientUpdate) return
+
+    try {
+      const result = await api.checkForClientUpdate()
+      console.log('[UpdateToast] client check result:', JSON.stringify(result))
+    } catch (err) {
+      console.warn('[UpdateToast] client check failed:', err)
+    }
+  }, [])
+
+  useEffect(() => {
+    // 监听客户端更新事件
+    const api = (window as any).electronAPI
+    if (!api) return
+
+    const removeAvailable = api.onClientUpdateAvailable?.((data: { version: string }) => {
+      console.log('[UpdateToast] Client update available:', data.version)
+      if (!updateInfo) {
+        setUpdateInfo({ version: data.version, type: 'client' })
+      }
+    })
+
+    const removeProgress = api.onClientDownloadProgress?.((data: { percent: number }) => {
+      setDownloadProgress(data.percent)
+    })
+
+    const removeDownloaded = api.onClientUpdateDownloaded?.(() => {
+      console.log('[UpdateToast] Client update downloaded')
+      relaunchingRef.current = true  // 标记正在重启，后续 error 事件不再处理
+      setDownloading(false)
+      setDownloadProgress(100)
+      // 延迟 1 秒后重启，让用户看到下载完成的提示
+      setTimeout(() => {
+        api.relaunchApp()
+      }, 1000)
+    })
+
+    const removeError = api.onClientUpdateError?.((error: string) => {
+      console.error('[UpdateToast] Update error:', error)
+      // 如果已经触发了 update-downloaded（正在重启），忽略后续 error
+      if (relaunchingRef.current) {
+        console.log('[UpdateToast] Ignoring error because relaunch is in progress')
+        return
+      }
+      setDownloading(false)
+      setUpdateInfo(null)
+    })
+
+    return () => {
+      removeAvailable?.()
+      removeProgress?.()
+      removeDownloaded?.()
+      removeError?.()
     }
   }, [updateInfo])
 
   useEffect(() => {
-    // 首次延迟 30 分钟后检查
-    const initialTimer = setTimeout(checkUpdate, UPDATE_CHECK_INTERVAL)
-    // 之后每 30 分钟检查一次
-    const interval = setInterval(checkUpdate, UPDATE_CHECK_INTERVAL)
+    // opencode: 5 分钟后首次检查，之后每 30 分钟
+    const opencodeTimer = setTimeout(checkOpencodeUpdate, OPENCODE_CHECK_DELAY)
+    const opencodeInterval = setInterval(checkOpencodeUpdate, OPENCODE_CHECK_INTERVAL)
+    
+    // 客户端: 35 分钟后首次检查，之后每 1 小时（与 opencode 错开 30 分钟）
+    const clientTimer = setTimeout(checkClientUpdate, CLIENT_CHECK_DELAY)
+    const clientInterval = setInterval(checkClientUpdate, CLIENT_CHECK_INTERVAL)
+    
     return () => {
-      clearTimeout(initialTimer)
-      clearInterval(interval)
+      clearTimeout(opencodeTimer)
+      clearInterval(opencodeInterval)
+      clearTimeout(clientTimer)
+      clearInterval(clientInterval)
     }
-  }, [checkUpdate])
+  }, [checkOpencodeUpdate, checkClientUpdate])
 
   const handleUpdate = () => {
     const api = (window as any).electronAPI
     if (!api) return
     
-    // 重启应用以应用更新
-    api.relaunchApp()
+    // 根据更新类型执行不同操作
+    if (updateInfo?.type === 'opencode') {
+      // opencode 更新：重启应用即可（启动时会自动应用 pending.json）
+      api.relaunchApp()
+    } else if (updateInfo?.type === 'client') {
+      // 客户端更新：下载安装包后重启
+      if (downloading) return // 防止重复点击
+      
+      setDownloading(true)
+      setDownloadProgress(0)
+      
+      api.downloadClientUpdate().then((result: any) => {
+        if (result.success) {
+          // 下载完成，等待 onClientUpdateDownloaded 事件
+          console.log('[UpdateToast] Download started')
+        } else {
+          console.error('[UpdateToast] Download failed:', result.error)
+          setDownloading(false)
+        }
+      }).catch((err: any) => {
+        console.error('[UpdateToast] Download error:', err)
+        setDownloading(false)
+      })
+    }
   }
 
   const handleDismiss = () => {
@@ -81,19 +174,35 @@ function UpdateToast() {
 
   if (!updateInfo) return null
 
+  const isOpencode = updateInfo.type === 'opencode'
+  const isDownloaded = updateInfo.version.includes('(已下载)')
+
   return (
     <div className="update-toast">
       <div className="update-toast-content">
         <div className="update-toast-icon">⬆️</div>
         <div className="update-toast-text">
-          <strong>发现新版本 Build {updateInfo.version}</strong>
-          <p>Kingdee Code 有新版本可用，是否立即更新？</p>
+          <strong>发现新版本 {isOpencode ? 'Build' : '客户端'} {updateInfo.version.replace(' (已下载)', '')}</strong>
+          {downloading ? (
+            <div className="update-toast-progress">
+              <div className="update-toast-progress-bar">
+                <div className="update-toast-progress-fill" style={{ width: `${downloadProgress}%` }} />
+              </div>
+              <span className="update-toast-percent">{downloadProgress}%</span>
+            </div>
+          ) : (
+            <p>{isOpencode ? 'Kingdee Code' : 'Kingdee KWork'} 有新版本可用，是否立即更新？</p>
+          )}
         </div>
       </div>
-      <div className="update-toast-actions">
-        <button className="update-toast-btn primary" onClick={handleUpdate}>立即更新</button>
-        <button className="update-toast-btn" onClick={handleDismiss}>稍后再说</button>
-      </div>
+      {!downloading && (
+        <div className="update-toast-actions">
+          <button className="update-toast-btn primary" onClick={handleUpdate}>
+            {isDownloaded ? '重启安装' : '立即更新'}
+          </button>
+          <button className="update-toast-btn" onClick={handleDismiss}>稍后再说</button>
+        </div>
+      )}
     </div>
   )
 }

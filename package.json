@@ -2,7 +2,7 @@
   "name": "kingdee-kwork",
   "productName": "Kingdee KWork",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Kingdee KWork Desktop Client",
   "author": "Kingdee",
   "main": "electron/main.cjs",
@@ -36,7 +36,10 @@
       {
         "from": "electron/bin/",
         "to": "bin/",
-        "filter": ["opencode", "opencode.exe"]
+        "filter": [
+          "opencode",
+          "opencode.exe"
+        ]
       }
     ],
     "mac": {
@@ -74,6 +77,7 @@
     }
   },
   "dependencies": {
+    "electron-updater": "^6.8.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",

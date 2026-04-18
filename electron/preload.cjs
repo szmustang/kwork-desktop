@@ -17,4 +17,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('opencode-install-progress', (_event, progress) => callback(progress));
     return () => ipcRenderer.removeAllListeners('opencode-install-progress');
   },
+  // Client auto-update
+  checkForClientUpdate: () => ipcRenderer.invoke('check-for-client-update'),
+  downloadClientUpdate: () => ipcRenderer.invoke('download-client-update'),
+  onClientUpdateAvailable: (cb) => {
+    const listener = (_, data) => cb(data);
+    ipcRenderer.on('client-update-available', listener);
+    return () => ipcRenderer.removeListener('client-update-available', listener);
+  },
+  onClientDownloadProgress: (cb) => {
+    const listener = (_, data) => cb(data);
+    ipcRenderer.on('client-download-progress', listener);
+    return () => ipcRenderer.removeListener('client-download-progress', listener);
+  },
+  onClientUpdateDownloaded: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on('client-update-downloaded', listener);
+    return () => ipcRenderer.removeListener('client-update-downloaded', listener);
+  },
+  onClientUpdateError: (cb) => {
+    const listener = (_, error) => cb(error);
+    ipcRenderer.on('client-update-error', listener);
+    return () => ipcRenderer.removeListener('client-update-error', listener);
+  },
 });

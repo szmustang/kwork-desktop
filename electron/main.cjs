@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog, shell } = require('electron');
 const path = require('path');
+const { autoUpdater } = require('electron-updater');
 const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion, checkPendingUpdate } = require('./sidecar.cjs');
 
 const devServerURL = process.env.VITE_DEV_SERVER_URL;
@@ -141,8 +142,88 @@ ipcMain.handle('relaunch-app', () => {
   app.exit(0);
 });
 
+// Client auto-update IPC handlers
+ipcMain.handle('check-for-client-update', async () => {
+  try {
+    await autoUpdater.checkForUpdates();
+    return { success: true };
+  } catch (err) {
+    console.error('[AutoUpdater] Check failed:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('download-client-update', async () => {
+  try {
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (err) {
+    console.error('[AutoUpdater] Download failed:', err);
+    return { success: false, error: err.message };
+  }
+});
+
 // 设置应用名称
 app.name = 'Kingdee KWork';
+
+// 配置自动更新
+autoUpdater.setFeedURL({
+  provider: 'generic',
+  url: 'http://tdmrxr8op.hn-bkt.clouddn.com/updates/'
+});
+
+// 开发模式下强制检查更新（仅用于测试）
+autoUpdater.forceDevUpdateConfig = true;
+
+// 禁用自动下载，我们手动控制
+autoUpdater.autoDownload = false;
+
+// 自动更新事件监听
+autoUpdater.on('checking-for-update', () => {
+  console.log('[AutoUpdater] Checking for update...');
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('[AutoUpdater] Update available:', info.version);
+  if (mainWindow) {
+    mainWindow.webContents.send('client-update-available', {
+      version: info.version,
+      releaseNotes: info.releaseNotes
+    });
+  }
+});
+
+autoUpdater.on('update-not-available', () => {
+  console.log('[AutoUpdater] No update available');
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('[AutoUpdater] Error:', err.message);
+  if (mainWindow) {
+    mainWindow.webContents.send('client-update-error', err.message);
+  }
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  const percent = Math.round(progressObj.percent);
+  const speed = (progressObj.bytesPerSecond / 1024 / 1024).toFixed(2);
+  console.log(`[AutoUpdater] Download progress: ${percent}% (${speed} MB/s)`);
+  if (mainWindow) {
+    mainWindow.webContents.send('client-download-progress', {
+      percent,
+      speed,
+      transferred: progressObj.transferred,
+      total: progressObj.total
+    });
+  }
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('[AutoUpdater] Update downloaded:', info.version);
+  if (mainWindow) {
+    mainWindow.webContents.send('client-update-downloaded');
+  }
+});
 
 // 强制 Chromium 使用亮色模式，影响 webview 中 prefers-color-scheme 媒体查询
 // 主窗口使用硬编码暗色样式，不受此设置影响
