@@ -2,7 +2,7 @@
   "name": "kingdee-kwork",
   "productName": "Kingdee KWork",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "Kingdee KWork Desktop Client",
   "author": "Kingdee",
   "main": "electron/main.cjs",
@@ -47,6 +47,13 @@
       "target": [
         {
           "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "arm64",
             "x64"
