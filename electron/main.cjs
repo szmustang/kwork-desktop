@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog, shell } = require('electron');
 const path = require('path');
 const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion, installOpencode, checkForUpdate, updateOpencode } = require('./sidecar.cjs');
 
@@ -120,6 +120,13 @@ ipcMain.handle('select-folder', async () => {
   });
   if (result.canceled) return { canceled: true };
   return { canceled: false, path: result.filePaths[0] };
+});
+
+ipcMain.handle('open-path', async (_event, targetPath) => {
+  if (!targetPath || typeof targetPath !== 'string') return { success: false, error: 'Invalid path' };
+  const errorMessage = await shell.openPath(targetPath);
+  // shell.openPath returns empty string on success, error message on failure
+  return errorMessage ? { success: false, error: errorMessage } : { success: true };
 });
 
 ipcMain.handle('relaunch-app', () => {
