@@ -85,8 +85,8 @@ function OpenCodeWebview({ serverUrl }: { serverUrl: string }) {
 export default function DevTab({ setup }: { setup: OpenCodeSetupResult }) {
   const { status, serverUrl } = setup.state
 
-  // 未安装 / 出错 → 显示提示
-  if (status === 'not-installed' || status === 'error') {
+  // 未安装 / 出错 / 下载中 / 安装中 / 启动中 → 显示提示
+  if (status === 'not-installed' || status === 'error' || status === 'downloading' || status === 'installing' || status === 'starting') {
     return (
       <div className="dt-container">
         <OpenCodeSetup
@@ -106,7 +106,7 @@ export default function DevTab({ setup }: { setup: OpenCodeSetupResult }) {
     )
   }
 
-  // 其他情况（checking / starting / ready但无url）→ 统一显示一个简洁 spinner
+  // 其他情况（checking / ready但无url）→ spinner
   return (
     <div className="dt-container">
       <div className="dt-setup">
