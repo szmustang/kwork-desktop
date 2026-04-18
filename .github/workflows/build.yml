@@ -42,8 +42,8 @@ jobs:
 
       - name: Build & Package (macOS ${{ matrix.arch }})
         run: |
-          vite build
-          electron-builder --mac --${{ matrix.arch }}
+          npx vite build
+          npx electron-builder --mac --${{ matrix.arch }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
