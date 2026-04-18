@@ -34,34 +34,31 @@ const tabs: { key: TabKey; label: string }[] = [
 
 /* ── 右下角更新提示弹窗 ── */
 
-const UPDATE_CHECK_INTERVAL = 15 * 60 * 1000 // 15 分钟
+const UPDATE_CHECK_INTERVAL = 30 * 60 * 1000 // 30 分钟
 
 function UpdateToast() {
-  const [updateInfo, setUpdateInfo] = useState<{ latestVersion: string } | null>(null)
-  const [updating, setUpdating] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const dismissed = useRef(false)
+  const [updateInfo, setUpdateInfo] = useState<{ version: string } | null>(null)
 
   const checkUpdate = useCallback(async () => {
-    if (dismissed.current || updating) return
     const api = (window as any).electronAPI
-    if (!api?.checkUpdate) return
+    if (!api?.checkPendingUpdate) return
 
     try {
-      const result = await api.checkUpdate()
+      const result = await api.checkPendingUpdate()
       console.log('[UpdateToast] check result:', JSON.stringify(result))
-      if (result.hasUpdate && result.latestVersion) {
-        setUpdateInfo({ latestVersion: result.latestVersion })
+      // 每 30 分钟都检查，但只有弹窗未显示时才弹出
+      if (result.hasUpdate && result.version && !updateInfo) {
+        setUpdateInfo({ version: result.version })
       }
     } catch (err) {
       console.warn('[UpdateToast] check failed:', err)
     }
-  }, [updating])
+  }, [updateInfo])
 
   useEffect(() => {
-    // 首次延迟 2 分钟后检查（避免与启动时检查冲突）
-    const initialTimer = setTimeout(checkUpdate, 2 * 60 * 1000)
-    // 之后每 15 分钟检查一次
+    // 首次延迟 30 分钟后检查
+    const initialTimer = setTimeout(checkUpdate, UPDATE_CHECK_INTERVAL)
+    // 之后每 30 分钟检查一次
     const interval = setInterval(checkUpdate, UPDATE_CHECK_INTERVAL)
     return () => {
       clearTimeout(initialTimer)
@@ -69,42 +66,16 @@ function UpdateToast() {
     }
   }, [checkUpdate])
 
-  const handleUpdate = async () => {
+  const handleUpdate = () => {
     const api = (window as any).electronAPI
     if (!api) return
-
-    setUpdating(true)
-    setProgress(0)
-
-    // 监听下载进度
-    const removeListener = api.onInstallProgress?.((p: any) => {
-      if (p.stage === 'downloading' && p.percent) {
-        setProgress(p.percent)
-      }
-    })
-
-    try {
-      const result = await api.updateOpencode()
-      if (removeListener) removeListener()
-
-      if (result.success) {
-        // 更新成功，重启应用
-        api.relaunchApp()
-      } else {
-        console.error('[UpdateToast] update failed:', result.error)
-        setUpdating(false)
-        setUpdateInfo(null)
-      }
-    } catch (err) {
-      if (removeListener) removeListener()
-      console.error('[UpdateToast] update error:', err)
-      setUpdating(false)
-      setUpdateInfo(null)
-    }
+    
+    // 重启应用以应用更新
+    api.relaunchApp()
   }
 
   const handleDismiss = () => {
-    dismissed.current = true
+    // 只关闭弹窗，不清除状态，30 分钟后检查时会自动再次弹出
     setUpdateInfo(null)
   }
 
@@ -115,25 +86,14 @@ function UpdateToast() {
       <div className="update-toast-content">
         <div className="update-toast-icon">⬆️</div>
         <div className="update-toast-text">
-          <strong>发现新版本 {updateInfo.latestVersion}</strong>
-          {updating ? (
-            <div className="update-toast-progress">
-              <div className="update-toast-progress-bar">
-                <div className="update-toast-progress-fill" style={{ width: `${progress}%` }} />
-              </div>
-              <span className="update-toast-percent">{progress}%</span>
-            </div>
-          ) : (
-            <p>Kingdee Code 有新版本可用，是否立即更新？</p>
-          )}
+          <strong>发现新版本 Build {updateInfo.version}</strong>
+          <p>Kingdee Code 有新版本可用，是否立即更新？</p>
         </div>
       </div>
-      {!updating && (
-        <div className="update-toast-actions">
-          <button className="update-toast-btn primary" onClick={handleUpdate}>立即更新</button>
-          <button className="update-toast-btn" onClick={handleDismiss}>稍后再说</button>
-        </div>
-      )}
+      <div className="update-toast-actions">
+        <button className="update-toast-btn primary" onClick={handleUpdate}>立即更新</button>
+        <button className="update-toast-btn" onClick={handleDismiss}>稍后再说</button>
+      </div>
     </div>
   )
 }
