@@ -45,7 +45,9 @@ function UpdateToast() {
   const [updateInfo, setUpdateInfo] = useState<{ version: string; type: 'opencode' | 'client' } | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
   const relaunchingRef = useRef(false)  // 标记是否正在重启安装，防止 error 事件干扰
+  const downloadingRef = useRef(false)  // 用 ref 跟踪下载状态，避免闭包捕获旧值
 
   // 检查 opencode 更新
   const checkOpencodeUpdate = useCallback(async () => {
@@ -94,13 +96,11 @@ function UpdateToast() {
 
     const removeDownloaded = api.onClientUpdateDownloaded?.(() => {
       console.log('[UpdateToast] Client update downloaded')
-      relaunchingRef.current = true  // 标记正在重启，后续 error 事件不再处理
       setDownloading(false)
+      downloadingRef.current = false
       setDownloadProgress(100)
-      // 延迟 1 秒后重启，让用户看到下载完成的提示
-      setTimeout(() => {
-        api.relaunchApp()
-      }, 1000)
+      setDownloadError(null)
+      // 下载完成后不自动安装，等待用户点击「重启安装」按钮确认
     })
 
     const removeError = api.onClientUpdateError?.((error: string) => {
@@ -108,6 +108,14 @@ function UpdateToast() {
       // 如果已经触发了 update-downloaded（正在重启），忽略后续 error
       if (relaunchingRef.current) {
         console.log('[UpdateToast] Ignoring error because relaunch is in progress')
+        return
+      }
+      // 下载过程中的错误：不清除弹窗，显示错误状态让用户可以重试
+      if (downloadingRef.current) {
+        console.log('[UpdateToast] Download error, showing retry state')
+        setDownloading(false)
+        downloadingRef.current = false
+        setDownloadError(error)
         return
       }
       setDownloading(false)
@@ -148,23 +156,34 @@ function UpdateToast() {
       // opencode 更新：重启应用即可（启动时会自动应用 pending.json）
       api.relaunchApp()
     } else if (updateInfo?.type === 'client') {
-      // 客户端更新：下载安装包后重启
+      // 已下载完成：用户确认后执行安装重启
+      if (downloadProgress >= 100) {
+        relaunchingRef.current = true
+        api.installClientUpdate()
+        return
+      }
+      // 客户端更新：下载安装包
       if (downloading) return // 防止重复点击
       
       setDownloading(true)
+      downloadingRef.current = true
       setDownloadProgress(0)
+      setDownloadError(null)
       
       api.downloadClientUpdate().then((result: any) => {
         if (result.success) {
-          // 下载完成，等待 onClientUpdateDownloaded 事件
           console.log('[UpdateToast] Download started')
         } else {
           console.error('[UpdateToast] Download failed:', result.error)
           setDownloading(false)
+          downloadingRef.current = false
+          setDownloadError(result.error)
         }
       }).catch((err: any) => {
         console.error('[UpdateToast] Download error:', err)
         setDownloading(false)
+        downloadingRef.current = false
+        setDownloadError(String(err))
       })
     }
   }
@@ -177,14 +196,14 @@ function UpdateToast() {
   if (!updateInfo) return null
 
   const isOpencode = updateInfo.type === 'opencode'
-  const isDownloaded = updateInfo.version.includes('(已下载)')
+  const isClientDownloaded = updateInfo.type === 'client' && downloadProgress >= 100
 
   return (
     <div className="update-toast">
       <div className="update-toast-content">
         <div className="update-toast-icon">⬆️</div>
         <div className="update-toast-text">
-          <strong>发现新版本 {isOpencode ? 'Build' : '客户端'} {updateInfo.version.replace(' (已下载)', '')}</strong>
+          <strong>发现新版本 {isOpencode ? 'Build' : '客户端'} {updateInfo.version}</strong>
           {downloading ? (
             <div className="update-toast-progress">
               <div className="update-toast-progress-bar">
@@ -192,6 +211,10 @@ function UpdateToast() {
               </div>
               <span className="update-toast-percent">{downloadProgress}%</span>
             </div>
+          ) : downloadError ? (
+            <p style={{ color: '#e5534b' }}>下载失败，请点击重试</p>
+          ) : isClientDownloaded ? (
+            <p>下载完成，点击「重启安装」应用更新</p>
           ) : (
             <p>{isOpencode ? 'Kingdee Code' : 'Kingdee KWork'} 有新版本可用，是否立即更新？</p>
           )}
@@ -200,7 +223,7 @@ function UpdateToast() {
       {!downloading && (
         <div className="update-toast-actions">
           <button className="update-toast-btn primary" onClick={handleUpdate}>
-            {isDownloaded ? '重启安装' : '立即更新'}
+            {isClientDownloaded ? '重启安装' : '立即更新'}
           </button>
           <button className="update-toast-btn" onClick={handleDismiss}>稍后再说</button>
         </div>
@@ -217,6 +240,16 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('kwork-theme') as 'dark' | 'light') || 'light'
   })
+  const [appVersion, setAppVersion] = useState('')
+
+  useEffect(() => {
+    const api = (window as any).electronAPI
+    api?.getAppVersion?.().then((v: string) => setAppVersion(v || ''))
+    // 设置平台 CSS 类，用于区分 macOS/Windows 布局
+    if (api?.platform) {
+      document.documentElement.setAttribute('data-platform', api.platform)
+    }
+  }, [])
 
   // 登录状态管理
   const [user, setUser] = useState<UserInfo | null>(() => {
@@ -294,6 +327,7 @@ function App() {
             </svg>
           </button>
           <UserDropdown user={user} onLogout={handleLogout} />
+          {appVersion && <span className="app-version">v{appVersion}</span>}
         </div>
       </header>
 

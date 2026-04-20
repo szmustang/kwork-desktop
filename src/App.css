@@ -82,6 +82,11 @@ body {
   z-index: 100;
 }
 
+/* Windows: 左侧不需红绿灰空间，右侧给 titleBarOverlay 按钮留位 */
+[data-platform="win32"] .topbar {
+  padding: 0 140px 0 16px;
+}
+
 .topbar-left {
   display: flex;
   align-items: center;

@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getServerInfo: () => ipcRenderer.invoke('get-server-info'),
   killSidecar: () => ipcRenderer.invoke('kill-sidecar'),
   // Opencode management
@@ -22,6 +23,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Client auto-update
   checkForClientUpdate: () => ipcRenderer.invoke('check-for-client-update'),
   downloadClientUpdate: () => ipcRenderer.invoke('download-client-update'),
+  installClientUpdate: () => ipcRenderer.invoke('install-client-update'),
   onClientUpdateAvailable: (cb) => {
     const listener = (_, data) => cb(data);
     ipcRenderer.on('client-update-available', listener);

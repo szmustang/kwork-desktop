@@ -1,5 +1,7 @@
 const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents } = require('./sidecar.cjs');
 
@@ -11,8 +13,10 @@ app.commandLine.appendSwitch('disable-mac-app-state-restoration');
 
 let mainWindow = null;
 let forceQuit = false;
+let downloadedFilePath = null; // 保存下载的更新文件路径
 
 function createWindow() {
+  const isWin = process.platform === 'win32';
   mainWindow = new BrowserWindow({
     title: '',
     width: 1200,
@@ -20,6 +24,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     titleBarStyle: 'hidden',
+    titleBarOverlay: isWin ? { color: '#00000000', symbolColor: '#666666', height: 40 } : undefined,
     trafficLightPosition: { x: 12, y: 12 },
     backgroundColor: '#ffffff',
     webPreferences: {
@@ -62,6 +67,10 @@ function createWindow() {
 }
 
 // IPC handlers
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
 ipcMain.handle('get-server-info', async () => {
   try {
     await startSidecar();
@@ -129,7 +138,7 @@ ipcMain.handle('start-sidecar', async () => {
 
 ipcMain.handle('select-folder', async () => {
   const result = await dialog.showOpenDialog({
-    properties: ['openDirectory'],
+    properties: ['openDirectory', 'createDirectory'],
   });
   if (result.canceled) return { canceled: true };
   return { canceled: false, path: result.filePaths[0] };
@@ -169,6 +178,54 @@ ipcMain.handle('download-client-update', async () => {
   }
 });
 
+ipcMain.handle('install-client-update', () => {
+  killSidecar();
+  // macOS: 必须先设置 forceQuit，否则 close 事件拦截会阻止退出，导致窗口仅被隐藏
+  forceQuit = true;
+
+  if (process.platform === 'win32' && downloadedFilePath && downloadedFilePath.endsWith('.zip')) {
+    // Windows zip 更新：electron-updater 的 NsisUpdater 无法处理 zip（它只会运行 exe 安装器）
+    // 需要手动解压 zip 并用脚本替换应用文件后重启
+    const appDir = path.dirname(process.execPath);
+    const ps1Path = path.join(app.getPath('temp'), 'kwork-update.ps1');
+    const script = [
+      '# Wait for app to exit',
+      `Start-Sleep -Seconds 2`,
+      '# Extract zip to temp dir',
+      `$zip = '${downloadedFilePath.replace(/'/g, "''")}';`,
+      `$tmp = Join-Path $env:TEMP 'kwork-update-extract';`,
+      `if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force };`,
+      `Expand-Archive -Path $zip -DestinationPath $tmp -Force;`,
+      '# Find the inner app directory (e.g. "Kingdee KWork-x.x.x-win")',
+      `$inner = Get-ChildItem $tmp -Directory | Select-Object -First 1;`,
+      `$src = if ($inner) { $inner.FullName } else { $tmp };`,
+      '# Copy all files to app directory, overwriting existing',
+      `$dest = '${appDir.replace(/'/g, "''")}';`,
+      `Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force;`,
+      '# Clean up',
+      `Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue;`,
+      '# Restart app',
+      `Start-Process -FilePath (Join-Path $dest '${path.basename(process.execPath)}');`,
+    ].join('\n');
+
+    fs.writeFileSync(ps1Path, script, 'utf-8');
+    console.log('[AutoUpdater] Windows zip update: wrote PS1 script to', ps1Path);
+
+    // Spawn PowerShell detached so it survives app exit
+    const child = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', ps1Path], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    child.unref();
+
+    app.exit(0);
+  } else {
+    // macOS: Squirrel 静默替换 .app；Windows exe: 启动 NSIS 安装程序
+    autoUpdater.quitAndInstall(false, true);
+  }
+});
+
 // 设置应用名称
 app.name = 'Kingdee KWork';
 
@@ -183,6 +240,9 @@ autoUpdater.forceDevUpdateConfig = true;
 
 // 禁用自动下载，我们手动控制
 autoUpdater.autoDownload = false;
+
+// 禁用退出时自动安装，由用户确认后手动触发
+autoUpdater.autoInstallOnAppQuit = false;
 
 // 自动更新事件监听
 autoUpdater.on('checking-for-update', () => {
@@ -226,6 +286,11 @@ autoUpdater.on('download-progress', (progressObj) => {
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('[AutoUpdater] Update downloaded:', info.version);
+  // 保存下载的文件路径，Windows zip 更新需要用到
+  if (info.downloadedFile) {
+    downloadedFilePath = info.downloadedFile;
+    console.log('[AutoUpdater] Downloaded file:', downloadedFilePath);
+  }
   if (mainWindow) {
     mainWindow.webContents.send('client-update-downloaded');
   }
