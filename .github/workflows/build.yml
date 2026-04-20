@@ -147,6 +147,7 @@ jobs:
           name: win
           path: |
             release/*.exe
+            release/*.zip
             release/*.yml
           retention-days: 5
 
