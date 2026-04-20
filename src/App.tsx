@@ -43,7 +43,9 @@ function UpdateToast() {
   const [updateInfo, setUpdateInfo] = useState<{ version: string; type: 'opencode' | 'client' } | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
   const relaunchingRef = useRef(false)  // 标记是否正在重启安装，防止 error 事件干扰
+  const downloadingRef = useRef(false)  // 用 ref 跟踪下载状态，避免闭包捕获旧值
 
   // 检查 opencode 更新
   const checkOpencodeUpdate = useCallback(async () => {
@@ -93,7 +95,9 @@ function UpdateToast() {
     const removeDownloaded = api.onClientUpdateDownloaded?.(() => {
       console.log('[UpdateToast] Client update downloaded')
       setDownloading(false)
+      downloadingRef.current = false
       setDownloadProgress(100)
+      setDownloadError(null)
       // 下载完成后不自动安装，等待用户点击「重启安装」按钮确认
     })
 
@@ -102,6 +106,14 @@ function UpdateToast() {
       // 如果已经触发了 update-downloaded（正在重启），忽略后续 error
       if (relaunchingRef.current) {
         console.log('[UpdateToast] Ignoring error because relaunch is in progress')
+        return
+      }
+      // 下载过程中的错误：不清除弹窗，显示错误状态让用户可以重试
+      if (downloadingRef.current) {
+        console.log('[UpdateToast] Download error, showing retry state')
+        setDownloading(false)
+        downloadingRef.current = false
+        setDownloadError(error)
         return
       }
       setDownloading(false)
@@ -152,7 +164,9 @@ function UpdateToast() {
       if (downloading) return // 防止重复点击
       
       setDownloading(true)
+      downloadingRef.current = true
       setDownloadProgress(0)
+      setDownloadError(null)
       
       api.downloadClientUpdate().then((result: any) => {
         if (result.success) {
@@ -160,10 +174,14 @@ function UpdateToast() {
         } else {
           console.error('[UpdateToast] Download failed:', result.error)
           setDownloading(false)
+          downloadingRef.current = false
+          setDownloadError(result.error)
         }
       }).catch((err: any) => {
         console.error('[UpdateToast] Download error:', err)
         setDownloading(false)
+        downloadingRef.current = false
+        setDownloadError(String(err))
       })
     }
   }
@@ -191,6 +209,8 @@ function UpdateToast() {
               </div>
               <span className="update-toast-percent">{downloadProgress}%</span>
             </div>
+          ) : downloadError ? (
+            <p style={{ color: '#e5534b' }}>下载失败，请点击重试</p>
           ) : isClientDownloaded ? (
             <p>下载完成，点击「重启安装」应用更新</p>
           ) : (

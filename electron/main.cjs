@@ -171,6 +171,8 @@ ipcMain.handle('download-client-update', async () => {
 
 ipcMain.handle('install-client-update', () => {
   killSidecar();
+  // macOS: 必须先设置 forceQuit，否则 close 事件拦截会阻止退出，导致窗口仅被隐藏
+  forceQuit = true;
   // macOS: Squirrel 静默替换 .app；Windows: 启动 NSIS 安装程序
   autoUpdater.quitAndInstall(false, true);
 });
@@ -189,6 +191,9 @@ autoUpdater.forceDevUpdateConfig = true;
 
 // 禁用自动下载，我们手动控制
 autoUpdater.autoDownload = false;
+
+// 禁用退出时自动安装，由用户确认后手动触发
+autoUpdater.autoInstallOnAppQuit = false;
 
 // 自动更新事件监听
 autoUpdater.on('checking-for-update', () => {
