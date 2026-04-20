@@ -13,6 +13,7 @@ let mainWindow = null;
 let forceQuit = false;
 
 function createWindow() {
+  const isWin = process.platform === 'win32';
   mainWindow = new BrowserWindow({
     title: '',
     width: 1200,
@@ -20,6 +21,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     titleBarStyle: 'hidden',
+    titleBarOverlay: isWin ? { color: '#00000000', symbolColor: '#666666', height: 40 } : undefined,
     trafficLightPosition: { x: 12, y: 12 },
     backgroundColor: '#ffffff',
     webPreferences: {
@@ -62,6 +64,10 @@ function createWindow() {
 }
 
 // IPC handlers
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
 ipcMain.handle('get-server-info', async () => {
   try {
     await startSidecar();

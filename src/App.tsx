@@ -238,6 +238,16 @@ function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('kwork-theme') as 'dark' | 'light') || 'light'
   })
+  const [appVersion, setAppVersion] = useState('')
+
+  useEffect(() => {
+    const api = (window as any).electronAPI
+    api?.getAppVersion?.().then((v: string) => setAppVersion(v || ''))
+    // 设置平台 CSS 类，用于区分 macOS/Windows 布局
+    if (api?.platform) {
+      document.documentElement.setAttribute('data-platform', api.platform)
+    }
+  }, [])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -291,6 +301,7 @@ function App() {
             </svg>
           </button>
           <div className="user-avatar">U</div>
+          {appVersion && <span className="app-version">v{appVersion}</span>}
         </div>
       </header>
 
