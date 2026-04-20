@@ -123,7 +123,7 @@ ipcMain.handle('start-sidecar', async () => {
 
 ipcMain.handle('select-folder', async () => {
   const result = await dialog.showOpenDialog({
-    properties: ['openDirectory'],
+    properties: ['openDirectory', 'createDirectory'],
   });
   if (result.canceled) return { canceled: true };
   return { canceled: false, path: result.filePaths[0] };
