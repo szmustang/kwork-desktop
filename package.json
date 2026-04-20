@@ -2,7 +2,7 @@
   "name": "kingdee-kwork",
   "productName": "Kingdee KWork",
   "private": true,
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Kingdee KWork Desktop Client",
   "author": "Kingdee",
   "main": "electron/main.cjs",
