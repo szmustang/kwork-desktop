@@ -169,6 +169,12 @@ ipcMain.handle('download-client-update', async () => {
   }
 });
 
+ipcMain.handle('install-client-update', () => {
+  killSidecar();
+  // macOS: Squirrel 静默替换 .app；Windows: 启动 NSIS 安装程序
+  autoUpdater.quitAndInstall(false, true);
+});
+
 // 设置应用名称
 app.name = 'Kingdee KWork';
 

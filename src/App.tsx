@@ -95,9 +95,9 @@ function UpdateToast() {
       relaunchingRef.current = true  // 标记正在重启，后续 error 事件不再处理
       setDownloading(false)
       setDownloadProgress(100)
-      // 延迟 1 秒后重启，让用户看到下载完成的提示
+      // 延迟 1 秒后触发安装，让用户看到下载完成的提示
       setTimeout(() => {
-        api.relaunchApp()
+        api.installClientUpdate()
       }, 1000)
     })
 
