@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog, shell } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
-const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion, checkPendingUpdate } = require('./sidecar.cjs');
+const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents } = require('./sidecar.cjs');
 
 const devServerURL = process.env.VITE_DEV_SERVER_URL;
 
@@ -95,9 +95,15 @@ ipcMain.handle('check-pending-update', async () => {
   }
 });
 
-// install-opencode and update-opencode removed:
-// opencode binary is bundled via seedBundledBinary(); updates are applied
-// automatically from ~/.kcode/updates/update-pending.json on each launch.
+// Install opencode from CDN (first launch when no binary exists)
+ipcMain.handle('install-opencode', async () => {
+  return await installOpencode();
+});
+
+// Get current install state (for UI polling)
+ipcMain.handle('get-install-state', () => {
+  return getInstallState();
+});
 
 ipcMain.handle('toggle-devtools', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
@@ -239,6 +245,13 @@ app.on('web-contents-created', (_, contents) => {
     webPreferences.contextIsolation = true;
     webPreferences.nodeIntegration = false;
   });
+});
+
+// Forward install progress events to renderer
+installEvents.on('progress', (data) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('opencode-install-progress', data);
+  }
 });
 
 app.whenReady().then(() => {

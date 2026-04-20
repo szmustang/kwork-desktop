@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkOpencode: () => ipcRenderer.invoke('check-opencode'),
   getOpencodeVersion: () => ipcRenderer.invoke('get-opencode-version'),
   checkPendingUpdate: () => ipcRenderer.invoke('check-pending-update'),
+  installOpencode: () => ipcRenderer.invoke('install-opencode'),
+  getInstallState: () => ipcRenderer.invoke('get-install-state'),
   startSidecar: () => ipcRenderer.invoke('start-sidecar'),
   relaunchApp: () => ipcRenderer.invoke('relaunch-app'),
   toggleDevTools: () => ipcRenderer.invoke('toggle-devtools'),

@@ -1,9 +1,11 @@
 const { spawn, execFile } = require('child_process');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
+const { EventEmitter } = require('events');
 
 let sidecarProcess = null;
 let cachedServerInfo = null;
@@ -13,6 +15,19 @@ const KCODE_DIR = path.join(process.env.HOME || os.homedir(), '.kcode');
 const SERVER_JSON_PATH = path.join(KCODE_DIR, 'server.json');
 const UPDATES_DIR = path.join(KCODE_DIR, 'updates');
 const UPDATE_PENDING_PATH = path.join(UPDATES_DIR, 'update-pending.json');
+const DOWNLOAD_DIR = path.join(UPDATES_DIR, 'download');
+const CDN_BASE = 'http://tdmrxr8op.hn-bkt.clouddn.com/opencode';
+
+/* ── Install event emitter (main.cjs listens for progress) ── */
+const installEvents = new EventEmitter();
+
+/* ── Install state (shared across calls for concurrency safety) ── */
+let installState = {
+  status: 'idle',      // idle | downloading | installing | done | error
+  progress: 0,         // download percentage 0-100
+  error: null,
+  promise: null,       // current install promise (concurrency lock)
+};
 
 /* ── Paths ── */
 
@@ -47,40 +62,219 @@ function getOpencodeBinPath() {
   return path.join(binDir, exe);
 }
 
+/* ── CDN Download Logic ── */
+
 /**
- * In production, if ~/.kcode/bin/opencode doesn't exist but the app bundle
- * ships one in resources/bin/, copy it over so the first launch works offline.
+ * Get platform key for latest.json lookup.
+ * Returns e.g. 'darwin-arm64', 'darwin-x64', 'windows-x64'
  */
-function seedBundledBinary() {
-  const isDev = !!process.env.VITE_DEV_SERVER_URL;
-  if (isDev) return; // dev mode uses electron/bin directly
+function getPlatformKey() {
+  const p = process.platform === 'win32' ? 'windows' : process.platform;
+  return `${p}-${process.arch}`;
+}
 
-  const exe = process.platform === 'win32' ? 'opencode.exe' : 'opencode';
-  const dest = path.join(KCODE_DIR, 'bin', exe);
-  if (fs.existsSync(dest)) return; // already installed, skip
+/**
+ * Fetch JSON from a URL (supports http/https).
+ */
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http;
+    const req = client.get(url, { timeout: 15000 }, (res) => {
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        res.resume();
+        return reject(new Error(`HTTP ${res.statusCode} from ${url}`));
+      }
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error('Invalid JSON from ' + url)); }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout fetching ' + url)); });
+  });
+}
 
-  // electron-builder extraResources lands in <app>/Contents/Resources/bin/
-  const bundled = path.join(process.resourcesPath, 'bin', exe);
-  if (!fs.existsSync(bundled)) {
-    console.log('[Sidecar] No bundled binary found at', bundled);
-    return;
+/**
+ * Download a file with progress reporting.
+ * Returns the local file path.
+ */
+function downloadFile(url, destPath, onProgress) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+    const client = url.startsWith('https') ? https : http;
+    const req = client.get(url, { timeout: 60000 }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        // follow redirect
+        res.resume();
+        return downloadFile(res.headers.location, destPath, onProgress).then(resolve, reject);
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        res.resume();
+        return reject(new Error(`HTTP ${res.statusCode} downloading ${url}`));
+      }
+      const total = parseInt(res.headers['content-length'], 10) || 0;
+      let downloaded = 0;
+      const file = fs.createWriteStream(destPath);
+      res.on('data', (chunk) => {
+        downloaded += chunk.length;
+        if (total > 0 && onProgress) {
+          onProgress(Math.round((downloaded / total) * 100));
+        }
+      });
+      res.pipe(file);
+      file.on('finish', () => { file.close(() => resolve(destPath)); });
+      file.on('error', (err) => {
+        fs.unlink(destPath, () => {});
+        reject(err);
+      });
+    });
+    req.on('error', (err) => {
+      fs.unlink(destPath, () => {});
+      reject(err);
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      fs.unlink(destPath, () => {});
+      reject(new Error('Download timeout'));
+    });
+  });
+}
+
+/**
+ * Full install flow: fetch latest.json → download → verify → extract → cleanup.
+ * Emits events on installEvents for UI progress.
+ * Uses installState.promise as a concurrency lock.
+ */
+function installOpencode() {
+  // Concurrency lock: if already running, return the existing promise
+  if (installState.promise) {
+    console.log('[Sidecar] installOpencode() already in progress, reusing promise');
+    return installState.promise;
   }
 
-  console.log('[Sidecar] Seeding bundled opencode from', bundled, 'to', dest);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.copyFileSync(bundled, dest);
-  if (process.platform !== 'win32') {
-    fs.chmodSync(dest, 0o755);
+  const p = _doInstallOpencode();
+  installState.promise = p;
+  p.finally(() => { installState.promise = null; });
+  return p;
+}
+
+async function _doInstallOpencode() {
+  const platformKey = getPlatformKey();
+  console.log('[Sidecar] Installing opencode for platform:', platformKey);
+
+  // Update state: downloading
+  installState.status = 'downloading';
+  installState.progress = 0;
+  installState.error = null;
+  installEvents.emit('progress', { status: 'downloading', progress: 0 });
+
+  try {
+    // 1. Fetch latest.json
+    const latestUrl = `${CDN_BASE}/latest.json`;
+    console.log('[Sidecar] Fetching', latestUrl);
+    let latest;
+    try {
+      latest = await fetchJson(latestUrl);
+    } catch (err) {
+      throw new Error('无法获取版本信息: ' + err.message);
+    }
+
+    // 2. Match platform
+    const fileInfo = latest.files && latest.files[platformKey];
+    if (!fileInfo) {
+      throw new Error(`当前平台 ${platformKey} 暂不支持，请联系管理员`);
+    }
+
+    const assetName = fileInfo.name;
+    const expectedSha256 = (fileInfo.sha256 || '').toLowerCase();
+    const downloadUrl = `${CDN_BASE}/${assetName}`;
+    const localPath = path.join(DOWNLOAD_DIR, assetName);
+
+    console.log('[Sidecar] Downloading', downloadUrl, '→', localPath);
+
+    // 3. Download
+    await downloadFile(downloadUrl, localPath, (percent) => {
+      installState.progress = percent;
+      installEvents.emit('progress', { status: 'downloading', progress: percent });
+    });
+
+    // 4. SHA256 verify
+    installState.status = 'installing';
+    installState.progress = 100;
+    installEvents.emit('progress', { status: 'installing', progress: 100 });
+    console.log('[Sidecar] Download complete, verifying SHA256...');
+
+    if (expectedSha256) {
+      const computed = sha256File(localPath);
+      if (computed !== expectedSha256) {
+        // Clean up bad file
+        try { fs.unlinkSync(localPath); } catch (_) {}
+        throw new Error('文件校验失败 (SHA256 不匹配)，请重试');
+      }
+      console.log('[Sidecar] SHA256 OK');
+    }
+
+    // 5. Extract
+    console.log('[Sidecar] Extracting...');
+    const binDir = path.join(KCODE_DIR, 'bin');
+    fs.mkdirSync(binDir, { recursive: true });
+    const exeName = process.platform === 'win32' ? 'opencode.exe' : 'opencode';
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-install-'));
+
+    try {
+      await extractArchive(localPath, tmpDir);
+      const extracted = findFile(tmpDir, exeName);
+      if (!extracted) throw new Error('压缩包中未找到 opencode 可执行文件');
+
+      const destBin = path.join(binDir, exeName);
+      fs.copyFileSync(extracted, destBin);
+      if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
+      console.log('[Sidecar] Installed opencode to', destBin);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+
+    // 6. Cleanup download file
+    try {
+      fs.unlinkSync(localPath);
+      // Remove download dir if empty
+      const remaining = fs.readdirSync(DOWNLOAD_DIR);
+      if (remaining.length === 0) fs.rmdirSync(DOWNLOAD_DIR);
+    } catch (_) {}
+
+    installState.status = 'done';
+    installState.error = null;
+    installEvents.emit('progress', { status: 'done', progress: 100 });
+    console.log('[Sidecar] opencode install complete');
+    return { success: true };
+
+  } catch (err) {
+    console.error('[Sidecar] Install failed:', err.message);
+    installState.status = 'error';
+    installState.error = err.message;
+    installEvents.emit('progress', { status: 'error', error: err.message });
+    return { success: false, error: err.message };
   }
-  console.log('[Sidecar] Bundled opencode copied successfully');
 }
 
 /* ── Check if opencode is installed ── */
 
 function isOpencodeInstalled() {
-  seedBundledBinary(); // ensure bundled binary is copied on first launch
   const binPath = getOpencodeBinPath();
   return fs.existsSync(binPath);
+}
+
+/**
+ * Get the current install state (for UI polling).
+ */
+function getInstallState() {
+  return {
+    status: installState.status,
+    progress: installState.progress,
+    error: installState.error,
+  };
 }
 
 function getOpencodeVersion() {
@@ -591,4 +785,7 @@ module.exports = {
   applyPendingUpdate,
   checkPendingUpdate,
   getAppBinDir,
+  installOpencode,
+  getInstallState,
+  installEvents,
 };

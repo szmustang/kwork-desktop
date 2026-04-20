@@ -2,7 +2,7 @@
   "name": "kingdee-kwork",
   "productName": "Kingdee KWork",
   "private": true,
-  "version": "0.0.3",
+  "version": "0.0.5",
   "description": "Kingdee KWork Desktop Client",
   "author": "Kingdee",
   "main": "electron/main.cjs",
@@ -32,40 +32,18 @@
       "!electron/bin/**/*",
       "!electron/data/**/*"
     ],
-    "extraResources": [
-      {
-        "from": "electron/bin/",
-        "to": "bin/",
-        "filter": [
-          "opencode",
-          "opencode.exe"
-        ]
-      }
-    ],
-    "afterSign": "build/notarize.cjs",
     "mac": {
       "category": "public.app-category.developer-tools",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
+        "dmg",
+        "zip"
       ],
       "icon": "build/icon.png",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": false
     },
     "win": {
       "target": [
