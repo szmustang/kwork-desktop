@@ -92,13 +92,9 @@ function UpdateToast() {
 
     const removeDownloaded = api.onClientUpdateDownloaded?.(() => {
       console.log('[UpdateToast] Client update downloaded')
-      relaunchingRef.current = true  // 标记正在重启，后续 error 事件不再处理
       setDownloading(false)
       setDownloadProgress(100)
-      // 延迟 1 秒后触发安装，让用户看到下载完成的提示
-      setTimeout(() => {
-        api.installClientUpdate()
-      }, 1000)
+      // 下载完成后不自动安装，等待用户点击「重启安装」按钮确认
     })
 
     const removeError = api.onClientUpdateError?.((error: string) => {
@@ -146,7 +142,13 @@ function UpdateToast() {
       // opencode 更新：重启应用即可（启动时会自动应用 pending.json）
       api.relaunchApp()
     } else if (updateInfo?.type === 'client') {
-      // 客户端更新：下载安装包后重启
+      // 已下载完成：用户确认后执行安装重启
+      if (downloadProgress >= 100) {
+        relaunchingRef.current = true
+        api.installClientUpdate()
+        return
+      }
+      // 客户端更新：下载安装包
       if (downloading) return // 防止重复点击
       
       setDownloading(true)
@@ -154,7 +156,6 @@ function UpdateToast() {
       
       api.downloadClientUpdate().then((result: any) => {
         if (result.success) {
-          // 下载完成，等待 onClientUpdateDownloaded 事件
           console.log('[UpdateToast] Download started')
         } else {
           console.error('[UpdateToast] Download failed:', result.error)
@@ -175,14 +176,14 @@ function UpdateToast() {
   if (!updateInfo) return null
 
   const isOpencode = updateInfo.type === 'opencode'
-  const isDownloaded = updateInfo.version.includes('(已下载)')
+  const isClientDownloaded = updateInfo.type === 'client' && downloadProgress >= 100
 
   return (
     <div className="update-toast">
       <div className="update-toast-content">
         <div className="update-toast-icon">⬆️</div>
         <div className="update-toast-text">
-          <strong>发现新版本 {isOpencode ? 'Build' : '客户端'} {updateInfo.version.replace(' (已下载)', '')}</strong>
+          <strong>发现新版本 {isOpencode ? 'Build' : '客户端'} {updateInfo.version}</strong>
           {downloading ? (
             <div className="update-toast-progress">
               <div className="update-toast-progress-bar">
@@ -190,6 +191,8 @@ function UpdateToast() {
               </div>
               <span className="update-toast-percent">{downloadProgress}%</span>
             </div>
+          ) : isClientDownloaded ? (
+            <p>下载完成，点击「重启安装」应用更新</p>
           ) : (
             <p>{isOpencode ? 'Kingdee Code' : 'Kingdee KWork'} 有新版本可用，是否立即更新？</p>
           )}
@@ -198,7 +201,7 @@ function UpdateToast() {
       {!downloading && (
         <div className="update-toast-actions">
           <button className="update-toast-btn primary" onClick={handleUpdate}>
-            {isDownloaded ? '重启安装' : '立即更新'}
+            {isClientDownloaded ? '重启安装' : '立即更新'}
           </button>
           <button className="update-toast-btn" onClick={handleDismiss}>稍后再说</button>
         </div>
