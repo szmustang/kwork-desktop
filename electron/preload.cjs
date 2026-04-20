@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Client auto-update
   checkForClientUpdate: () => ipcRenderer.invoke('check-for-client-update'),
   downloadClientUpdate: () => ipcRenderer.invoke('download-client-update'),
+  installClientUpdate: () => ipcRenderer.invoke('install-client-update'),
   onClientUpdateAvailable: (cb) => {
     const listener = (_, data) => cb(data);
     ipcRenderer.on('client-update-available', listener);
