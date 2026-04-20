@@ -301,32 +301,7 @@ function App() {
         </nav>
 
         <div className="topbar-right">
-          <button
-            className="theme-btn"
-            title={theme === 'dark' ? '切换到浅色模式' : '切换到深色模式'}
-            onClick={toggleTheme}
-          >
-            {theme === 'dark' ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="5"/>
-                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-              </svg>
-            )}
-          </button>
-          <button
-            className="devtools-btn"
-            title="Toggle DevTools"
-            onClick={() => (window as any).electronAPI?.toggleDevTools()}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M1.5 1h13l.5.5v13l-.5.5h-13l-.5-.5v-13l.5-.5zM2 5v9h12V5H2zm0-1h12V2H2v2zm3-1H4V2h1v1zm2 0H6V2h1v1z"/>
-            </svg>
-          </button>
-          <UserDropdown user={user} onLogout={handleLogout} />
+          <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
           {appVersion && <span className="app-version">v{appVersion}</span>}
         </div>
       </header>

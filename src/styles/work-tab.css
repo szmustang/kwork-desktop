@@ -10,7 +10,7 @@
 .work-sidebar {
   width: 200px;
   min-width: 200px;
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color-light, var(--border-color));
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
@@ -65,7 +65,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color-light, var(--border-color));
   margin-top: 4px;
 }
 
@@ -145,7 +145,7 @@
 
 .work-main-header {
   padding: 16px 24px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -298,7 +298,7 @@
 /* ── 输入区 ── */
 .work-input-area {
   padding: 12px 24px 8px;
-  border-top: 1px solid var(--border-color);
+  border-top: none;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -307,7 +307,7 @@
 .work-input-container {
   width: 100%;
   max-width: 800px;
-  background: var(--bg-secondary);
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 16px;
   overflow: hidden;
@@ -396,7 +396,7 @@
 .work-right-panel {
   width: 280px;
   min-width: 280px;
-  border-left: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color-light, var(--border-color));
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -406,7 +406,7 @@
 
 .work-panel-section {
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color-light, var(--border-color));
 }
 
 .work-panel-section:last-child {

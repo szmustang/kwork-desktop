@@ -4,9 +4,11 @@ import type { UserInfo } from './LoginPage'
 interface UserDropdownProps {
   user: UserInfo
   onLogout: () => void
+  theme: 'dark' | 'light'
+  onToggleTheme: () => void
 }
 
-export default function UserDropdown({ user, onLogout }: UserDropdownProps) {
+export default function UserDropdown({ user, onLogout, theme, onToggleTheme }: UserDropdownProps) {
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -56,6 +58,26 @@ export default function UserDropdown({ user, onLogout }: UserDropdownProps) {
             <div className="user-dropdown-name">{user.displayName}</div>
             <div className="user-dropdown-role">{user.role}</div>
           </div>
+          <div className="user-dropdown-divider" />
+          <button className="user-dropdown-action" onClick={onToggleTheme}>
+            {theme === 'dark' ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="5"/>
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+            )}
+            <span>{theme === 'dark' ? '浅色模式' : '深色模式'}</span>
+          </button>
+          <button className="user-dropdown-action" onClick={() => (window as any).electronAPI?.toggleDevTools()}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M1.5 1h13l.5.5v13l-.5.5h-13l-.5-.5v-13l.5-.5zM2 5v9h12V5H2zm0-1h12V2H2v2zm3-1H4V2h1v1zm2 0H6V2h1v1z"/>
+            </svg>
+            <span>开发者工具</span>
+          </button>
           <div className="user-dropdown-divider" />
           <button className="user-dropdown-logout" onClick={onLogout}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -120,7 +120,7 @@ ipcMain.handle('toggle-devtools', (event) => {
     if (win.webContents.isDevToolsOpened()) {
       win.webContents.closeDevTools();
     } else {
-      win.webContents.openDevTools();
+      win.webContents.openDevTools({ mode: 'detach' });
     }
   }
 });

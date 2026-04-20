@@ -1,14 +1,15 @@
 /* ===== 全局变量 - Light 主题（默认） ===== */
 :root, [data-theme="light"] {
   --bg-primary: #ffffff;
-  --bg-secondary: #f6f8fa;
-  --bg-tertiary: #eef1f5;
-  --bg-hover: #e2e6eb;
-  --bg-active: #d8dce2;
-  --border-color: #d0d7de;
+  --bg-secondary: #fafafa;
+  --bg-tertiary: #f3f4f6;
+  --bg-hover: #f0f1f3;
+  --bg-active: #e8e9ec;
+  --border-color: #f0e8f0;
+  --border-color-light: #f5f0f5;
   --text-primary: #1f2328;
   --text-secondary: #656d76;
-  --text-muted: #8c959f;
+  --text-muted: #a0a7b0;
   --accent: #7c5cfc;
   --accent-hover: #6a4de0;
   --accent-dim: rgba(124, 92, 252, 0.1);
@@ -27,6 +28,7 @@
   --bg-hover: #21262d;
   --bg-active: #282e36;
   --border-color: #30363d;
+  --border-color-light: #30363d;
   --text-primary: #e6edf3;
   --text-secondary: #8b949e;
   --text-muted: #6e7681;
@@ -72,14 +74,34 @@ body {
 .topbar {
   height: var(--topbar-height);
   min-height: var(--topbar-height);
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  border-bottom: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 16px 0 78px;
   -webkit-app-region: drag;
   z-index: 100;
+  position: relative;
+}
+
+/* 底部渐变分割线 */
+.topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, #f0e0f0 0%, #e8d0e8 20%, #d8c8e8 50%, #e0d0e0 80%, #f0e0f0 100%);
+}
+
+[data-theme="dark"] .topbar {
+  background: var(--bg-secondary);
+}
+
+[data-theme="dark"] .topbar::after {
+  background: var(--border-color);
 }
 
 /* Windows: 左侧不需红绿灰空间，右侧给 titleBarOverlay 按钮留位 */
@@ -92,7 +114,7 @@ body {
   align-items: center;
   gap: 8px;
   -webkit-app-region: no-drag;
-  min-width: 160px;
+  min-width: 120px;
 }
 
 .logo-icon {
@@ -112,21 +134,21 @@ body {
 .topbar-tabs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   -webkit-app-region: no-drag;
   background: var(--bg-tertiary);
-  border-radius: 8px;
-  padding: 3px;
+  border-radius: 20px;
+  padding: 3px 4px;
 }
 
 .tab-btn {
   padding: 5px 20px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 13px;
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: 16px;
   cursor: pointer;
   transition: all 0.15s ease;
   -webkit-app-region: no-drag;
@@ -134,20 +156,20 @@ body {
 
 .tab-btn:hover {
   color: var(--text-primary);
-  background: var(--bg-hover);
 }
 
 .tab-btn.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-width: 160px;
+  gap: 6px;
+  min-width: 120px;
   justify-content: flex-end;
   -webkit-app-region: no-drag;
 }
@@ -207,12 +229,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
@@ -230,23 +252,25 @@ body {
 }
 
 .user-avatar-btn {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: #4caf50;
-  color: #fff;
+  border: 1.5px solid #4caf50;
+  background: transparent;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 13px;
+  font-weight: 600;
+  font-size: 11px;
   cursor: pointer;
   transition: box-shadow 0.15s;
   user-select: none;
+  overflow: hidden;
 }
 .user-avatar-btn:hover,
 .user-avatar-btn.active {
-  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--accent);
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 .user-dropdown-panel {
@@ -312,7 +336,33 @@ body {
   color: var(--text-primary);
 }
 
+.user-dropdown-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.user-dropdown-action:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 /* ===== 主内容区 ===== */
+
+.app-version {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  user-select: none;
+}
+
 .main-content {
   flex: 1;
   overflow: hidden;

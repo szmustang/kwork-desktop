@@ -9,7 +9,7 @@
 .chat-sidebar {
   width: 260px;
   min-width: 260px;
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color-light, var(--border-color));
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
@@ -21,7 +21,7 @@
   display: flex;
   padding: 12px 16px 0;
   gap: 20px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color-light, var(--border-color));
 }
 
 .sidebar-tab {
@@ -319,7 +319,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 20px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color-light, var(--border-color));
   background: var(--bg-primary);
 }
 
@@ -441,7 +441,7 @@
   line-height: 1.6;
   color: var(--text-primary);
   background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-color-light, var(--border-color));
   word-break: break-word;
 }
 
@@ -469,7 +469,7 @@
   align-items: center;
   gap: 8px;
   padding: 12px 20px 16px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color-light, var(--border-color));
   background: var(--bg-primary);
 }
 
