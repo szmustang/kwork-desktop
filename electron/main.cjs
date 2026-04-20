@@ -187,16 +187,31 @@ ipcMain.handle('install-client-update', () => {
   if (process.platform === 'win32' && downloadedFilePath && downloadedFilePath.endsWith('.zip')) {
     // Windows zip 更新：electron-updater 的 NsisUpdater 无法处理 zip（它只会运行 exe 安装器）
     // 需要手动解压 zip 并用脚本替换应用文件后重启
+    // Bug fix 1: 用 wscript.exe 启动脚本，避免 spawn detached 子进程随父进程退出被杀
+    // Bug fix 2: 脚本内自动检测写入权限，无权限时 UAC 提权
     const appDir = path.dirname(process.execPath);
     const ps1Path = path.join(app.getPath('temp'), 'kwork-update.ps1');
+    const vbsPath = path.join(app.getPath('temp'), 'kwork-update.vbs');
     const logPath = path.join(app.getPath('temp'), 'kwork-update.log');
     const script = [
       `$logFile = '${logPath.replace(/'/g, "''")}';`,
       `function Log($msg) { $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'; Add-Content -Path $logFile -Value "[$ts] $msg" }`,
       `Log 'Update script started';`,
+      '',
+      '# Check write permission to app directory, elevate if needed',
+      `$dest = '${appDir.replace(/'/g, "''")}';`,
+      `$testFile = Join-Path $dest '.update-write-test';`,
+      `try { [IO.File]::WriteAllText($testFile, 'test'); Remove-Item $testFile -Force; Log 'Write permission OK' }`,
+      `catch {`,
+      `  Log 'No write permission, elevating with UAC...';`,
+      `  Start-Process powershell -ArgumentList '-ExecutionPolicy','Bypass','-File','${ps1Path.replace(/'/g, "''")}' -Verb RunAs;`,
+      `  exit 0`,
+      `}`,
+      '',
       '# Wait for app to exit',
       `Log 'Waiting 3 seconds for app to exit...';`,
       `Start-Sleep -Seconds 3;`,
+      '',
       '# Extract zip to temp dir',
       `$zip = '${downloadedFilePath.replace(/'/g, "''")}';`,
       `Log "Zip file: $zip";`,
@@ -204,35 +219,43 @@ ipcMain.handle('install-client-update', () => {
       `$tmp = Join-Path $env:TEMP 'kwork-update-extract';`,
       `if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force };`,
       `try { Expand-Archive -Path $zip -DestinationPath $tmp -Force; Log 'Expand-Archive succeeded' } catch { Log "ERROR Expand-Archive: $_"; exit 1 }`,
+      '',
       '# Find the inner app directory',
       `$inner = Get-ChildItem $tmp -Directory | Select-Object -First 1;`,
       `$src = if ($inner) { $inner.FullName } else { $tmp };`,
       `Log "Source dir: $src";`,
       `Log "Files in source: $((Get-ChildItem $src).Count)";`,
+      '',
       '# Copy all files to app directory, overwriting existing',
-      `$dest = '${appDir.replace(/'/g, "''")}';`,
       `Log "Destination dir: $dest";`,
       `try { Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force; Log 'Copy succeeded' } catch { Log "ERROR Copy: $_"; exit 1 }`,
+      '',
       '# Clean up',
       `Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue;`,
       `Log 'Cleanup done';`,
-      '# Restart app',
-      `$exe = Join-Path $dest '${path.basename(process.execPath)}';`,
-      `Log "Restarting: $exe";`,
-      `Start-Process -FilePath $exe;`,
+      '',
+      '# Restart app as normal user (not elevated)',
+      `$appExe = Join-Path $dest '${path.basename(process.execPath)}';`,
+      `Log "Restarting: $appExe";`,
+      `Start-Process explorer.exe $appExe;`,
       `Log 'Update complete';`,
     ].join('\n');
 
-    fs.writeFileSync(ps1Path, script, 'utf-8');
-    console.log('[AutoUpdater] Windows zip update: wrote PS1 script to', ps1Path);
+    // VBScript wrapper: 用 wscript 启动 PowerShell，进程独立于 Electron 进程树
+    const vbsScript = [
+      'Set objShell = CreateObject("WScript.Shell")',
+      `objShell.Run "powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File ""${ps1Path}""", 0, False`,
+    ].join('\r\n');
 
-    // Spawn PowerShell detached so it survives app exit
-    const child = spawn('powershell', ['-ExecutionPolicy', 'Bypass', '-File', ps1Path], {
+    fs.writeFileSync(ps1Path, script, 'utf-8');
+    fs.writeFileSync(vbsPath, vbsScript, 'utf-8');
+    console.log('[AutoUpdater] Windows zip update: wrote PS1 to', ps1Path, 'VBS to', vbsPath);
+
+    // 用 wscript.exe 启动 VBS，进程完全独立，app.exit() 后继续运行
+    spawn('wscript.exe', [vbsPath], {
       detached: true,
       stdio: 'ignore',
-      windowsHide: true,
-    });
-    child.unref();
+    }).unref();
 
     app.exit(0);
   } else {
