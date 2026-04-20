@@ -165,10 +165,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Flatten artifacts (deduplicate)
+      - name: Flatten artifacts (deduplicate, clean)
         run: |
           mkdir -p upload
-          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.yml' -o -name '*.blockmap' \) | while read f; do
+          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.yml' \) \
+            ! -name 'builder-debug.yml' | while read f; do
             bn=$(basename "$f")
             if [ ! -f "upload/$bn" ]; then
               cp "$f" "upload/$bn"
