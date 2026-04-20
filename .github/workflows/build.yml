@@ -25,7 +25,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Import Code Signing Certificate
         env:
@@ -83,6 +83,19 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
+      - name: Rename artifacts (spaces to hyphens)
+        run: |
+          cd release
+          for f in *; do
+            nf=$(echo "$f" | tr ' ' '-')
+            if [ "$f" != "$nf" ]; then
+              echo "Renaming '$f' -> '$nf'"
+              mv "$f" "$nf"
+            fi
+          done
+          echo "=== Final release contents ==="
+          ls -la
+
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -91,6 +104,7 @@ jobs:
             release/*.dmg
             release/*.zip
             release/*.yml
+            release/*.blockmap
           retention-days: 5
 
   # ── Windows 构建 ──
@@ -105,7 +119,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build & Package (Windows)
         run: |
@@ -138,28 +152,38 @@ jobs:
       - name: List artifacts
         run: find artifacts -type f | head -50
 
-      - name: Delete existing draft releases for this tag
+      - name: Delete ALL existing releases for this tag
         run: |
           TAG=${GITHUB_REF#refs/tags/}
-          echo "Cleaning draft releases for $TAG..."
-          gh release list --limit 20 --json tagName,isDraft,databaseId \
-            | jq -r ".[] | select(.tagName==\"$TAG\" and .isDraft) | .databaseId" \
+          echo "Cleaning all releases for $TAG..."
+          gh release list --limit 50 --json tagName,isDraft,databaseId \
+            | jq -r ".[] | select(.tagName==\"$TAG\") | .databaseId" \
             | while read id; do
-                echo "Deleting draft release $id"
+                echo "Deleting release $id"
                 gh api -X DELETE /repos/${{ github.repository }}/releases/$id
               done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Flatten artifacts (deduplicate)
+        run: |
+          mkdir -p upload
+          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.yml' -o -name '*.blockmap' \) | while read f; do
+            bn=$(basename "$f")
+            if [ ! -f "upload/$bn" ]; then
+              cp "$f" "upload/$bn"
+            else
+              echo "SKIP duplicate: $bn"
+            fi
+          done
+          echo "=== Files to release ==="
+          ls -la upload/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           draft: true
           generate_release_notes: true
-          files: |
-            artifacts/**/*.dmg
-            artifacts/**/*.zip
-            artifacts/**/*.exe
-            artifacts/**/*.yml
+          files: upload/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
