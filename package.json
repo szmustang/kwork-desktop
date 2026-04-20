@@ -2,7 +2,7 @@
   "name": "kingdee-kwork",
   "productName": "Kingdee KWork",
   "private": true,
-  "version": "0.0.15",
+  "version": "0.0.16",
   "description": "Kingdee KWork Desktop Client",
   "author": "Kingdee",
   "main": "electron/main.cjs",
@@ -18,7 +18,7 @@
     "dist:win": "vite build && electron-builder --win",
     "dist:linux": "vite build && electron-builder --linux",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview" 
   },
   "build": {
     "appId": "com.kingdee.kwork",

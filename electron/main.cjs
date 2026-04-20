@@ -183,29 +183,44 @@ ipcMain.handle('install-client-update', () => {
   // macOS: 必须先设置 forceQuit，否则 close 事件拦截会阻止退出，导致窗口仅被隐藏
   forceQuit = true;
 
+  console.log('[AutoUpdater] install-client-update called, platform:', process.platform, 'downloadedFilePath:', downloadedFilePath);
   if (process.platform === 'win32' && downloadedFilePath && downloadedFilePath.endsWith('.zip')) {
     // Windows zip 更新：electron-updater 的 NsisUpdater 无法处理 zip（它只会运行 exe 安装器）
     // 需要手动解压 zip 并用脚本替换应用文件后重启
     const appDir = path.dirname(process.execPath);
     const ps1Path = path.join(app.getPath('temp'), 'kwork-update.ps1');
+    const logPath = path.join(app.getPath('temp'), 'kwork-update.log');
     const script = [
+      `$logFile = '${logPath.replace(/'/g, "''")}';`,
+      `function Log($msg) { $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'; Add-Content -Path $logFile -Value "[$ts] $msg" }`,
+      `Log 'Update script started';`,
       '# Wait for app to exit',
-      `Start-Sleep -Seconds 2`,
+      `Log 'Waiting 3 seconds for app to exit...';`,
+      `Start-Sleep -Seconds 3;`,
       '# Extract zip to temp dir',
       `$zip = '${downloadedFilePath.replace(/'/g, "''")}';`,
+      `Log "Zip file: $zip";`,
+      `if (!(Test-Path $zip)) { Log 'ERROR: Zip file not found!'; exit 1 }`,
       `$tmp = Join-Path $env:TEMP 'kwork-update-extract';`,
       `if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force };`,
-      `Expand-Archive -Path $zip -DestinationPath $tmp -Force;`,
-      '# Find the inner app directory (e.g. "Kingdee KWork-x.x.x-win")',
+      `try { Expand-Archive -Path $zip -DestinationPath $tmp -Force; Log 'Expand-Archive succeeded' } catch { Log "ERROR Expand-Archive: $_"; exit 1 }`,
+      '# Find the inner app directory',
       `$inner = Get-ChildItem $tmp -Directory | Select-Object -First 1;`,
       `$src = if ($inner) { $inner.FullName } else { $tmp };`,
+      `Log "Source dir: $src";`,
+      `Log "Files in source: $((Get-ChildItem $src).Count)";`,
       '# Copy all files to app directory, overwriting existing',
       `$dest = '${appDir.replace(/'/g, "''")}';`,
-      `Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force;`,
+      `Log "Destination dir: $dest";`,
+      `try { Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force; Log 'Copy succeeded' } catch { Log "ERROR Copy: $_"; exit 1 }`,
       '# Clean up',
       `Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue;`,
+      `Log 'Cleanup done';`,
       '# Restart app',
-      `Start-Process -FilePath (Join-Path $dest '${path.basename(process.execPath)}');`,
+      `$exe = Join-Path $dest '${path.basename(process.execPath)}';`,
+      `Log "Restarting: $exe";`,
+      `Start-Process -FilePath $exe;`,
+      `Log 'Update complete';`,
     ].join('\n');
 
     fs.writeFileSync(ps1Path, script, 'utf-8');
@@ -286,10 +301,32 @@ autoUpdater.on('download-progress', (progressObj) => {
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('[AutoUpdater] Update downloaded:', info.version);
+  console.log('[AutoUpdater] Event info keys:', Object.keys(info).join(', '));
   // 保存下载的文件路径，Windows zip 更新需要用到
   if (info.downloadedFile) {
     downloadedFilePath = info.downloadedFile;
-    console.log('[AutoUpdater] Downloaded file:', downloadedFilePath);
+    console.log('[AutoUpdater] Downloaded file (from event):', downloadedFilePath);
+  } else if (process.platform === 'win32') {
+    // 回退：扫描 updater 缓存目录查找 zip 文件
+    try {
+      const cacheDir = path.join(app.getPath('userData'), '..', 'kingdee-kwork-updater', 'pending');
+      console.log('[AutoUpdater] Scanning cache dir:', cacheDir);
+      if (fs.existsSync(cacheDir)) {
+        const files = fs.readdirSync(cacheDir).filter(f => f.endsWith('.zip'));
+        console.log('[AutoUpdater] Found zip files:', files);
+        if (files.length > 0) {
+          // 取最新的 zip 文件
+          const sorted = files.map(f => ({
+            name: f,
+            time: fs.statSync(path.join(cacheDir, f)).mtimeMs
+          })).sort((a, b) => b.time - a.time);
+          downloadedFilePath = path.join(cacheDir, sorted[0].name);
+          console.log('[AutoUpdater] Downloaded file (from scan):', downloadedFilePath);
+        }
+      }
+    } catch (err) {
+      console.error('[AutoUpdater] Failed to scan cache dir:', err.message);
+    }
   }
   if (mainWindow) {
     mainWindow.webContents.send('client-update-downloaded');
