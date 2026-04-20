@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Component, type ReactNode, type ErrorInfo } from 'react'
+import LoginPage, { type UserInfo } from './components/LoginPage'
+import UserDropdown from './components/UserDropdown'
 import ChatTab from './components/ChatTab'
 import WorkTab from './components/WorkTab'
 import DevTab from './components/DevTab'
@@ -216,6 +218,24 @@ function App() {
     return (localStorage.getItem('kwork-theme') as 'dark' | 'light') || 'light'
   })
 
+  // 登录状态管理
+  const [user, setUser] = useState<UserInfo | null>(() => {
+    try {
+      const stored = localStorage.getItem('kwork-user')
+      return stored ? JSON.parse(stored) : null
+    } catch { return null }
+  })
+
+  const handleLogin = useCallback((userInfo: UserInfo) => {
+    localStorage.setItem('kwork-user', JSON.stringify(userInfo))
+    setUser(userInfo)
+  }, [])
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('kwork-user')
+    setUser(null)
+  }, [])
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('kwork-theme', theme)
@@ -223,6 +243,12 @@ function App() {
 
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
 
+  // 未登录 → 显示登录页
+  if (!user) {
+    return <LoginPage onLogin={handleLogin} />
+  }
+
+  // 已登录 → 显示主界面
   return (
     <div className="app">
       {/* 顶部导航栏 */}
@@ -267,7 +293,7 @@ function App() {
               <path d="M1.5 1h13l.5.5v13l-.5.5h-13l-.5-.5v-13l.5-.5zM2 5v9h12V5H2zm0-1h12V2H2v2zm3-1H4V2h1v1zm2 0H6V2h1v1z"/>
             </svg>
           </button>
-          <div className="user-avatar">U</div>
+          <UserDropdown user={user} onLogout={handleLogout} />
         </div>
       </header>
 
