@@ -164,6 +164,19 @@ async function _doInstallOpencode() {
   const platformKey = getPlatformKey();
   console.log('[Sidecar] Installing opencode for platform:', platformKey);
 
+  // 清除旧的 opencode 二进制（如果存在），确保全新安装
+  const binDir = path.join(KCODE_DIR, 'bin');
+  const exeName = process.platform === 'win32' ? 'opencode.exe' : 'opencode';
+  const existingBin = path.join(binDir, exeName);
+  if (fs.existsSync(existingBin)) {
+    try {
+      fs.unlinkSync(existingBin);
+      console.log('[Sidecar] Removed existing opencode at', existingBin);
+    } catch (err) {
+      console.warn('[Sidecar] Failed to remove existing opencode:', err.message);
+    }
+  }
+
   // Update state: downloading
   installState.status = 'downloading';
   installState.progress = 0;
