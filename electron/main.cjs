@@ -170,6 +170,23 @@ ipcMain.handle('check-for-client-update', async () => {
 
 ipcMain.handle('download-client-update', async () => {
   try {
+    // Windows: 清理旧的 updater 缓存，避免使用过期/损坏的文件
+    if (process.platform === 'win32') {
+      try {
+        const cacheDir = path.join(app.getPath('userData'), '..', 'kingdee-kwork-updater', 'pending');
+        if (fs.existsSync(cacheDir)) {
+          const oldFiles = fs.readdirSync(cacheDir);
+          for (const f of oldFiles) {
+            try {
+              fs.unlinkSync(path.join(cacheDir, f));
+            } catch (_) { /* ignore */ }
+          }
+          console.log('[AutoUpdater] Cleared', oldFiles.length, 'cached files from', cacheDir);
+        }
+      } catch (err) {
+        console.warn('[AutoUpdater] Failed to clear cache:', err.message);
+      }
+    }
     await autoUpdater.downloadUpdate();
     return { success: true };
   } catch (err) {
