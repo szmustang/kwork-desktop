@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog, shell, clipboard, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -14,6 +14,24 @@ app.commandLine.appendSwitch('disable-mac-app-state-restoration');
 let mainWindow = null;
 let forceQuit = false;
 let downloadedFilePath = null; // 保存下载的更新文件路径
+
+// ── LingeeBridge 配置状态 ──
+// 由渲染进程推送，主进程作为 webview 配置的单一数据源
+let currentBridgeConfig = {
+  language: 'zh-CN',
+  theme: 'light',
+  auth: null,
+  hostVersion: '0.0.0', // app ready 后更新
+};
+
+/** 向所有 webview 广播消息 */
+function broadcastToWebviews(channel, ...args) {
+  for (const wc of webContents.getAllWebContents()) {
+    if (wc.getType() === 'webview' && !wc.isDestroyed()) {
+      wc.send(channel, ...args);
+    }
+  }
+}
 
 function createWindow() {
   const isWin = process.platform === 'win32';
@@ -163,8 +181,9 @@ ipcMain.handle('oauth2-login', async () => {
 
 
 
-ipcMain.handle('select-folder', async () => {
+ipcMain.handle('select-folder', async (_event, options) => {
   const result = await dialog.showOpenDialog({
+    title: options?.title,
     properties: ['openDirectory', 'createDirectory'],
   });
   if (result.canceled) return { canceled: true };
@@ -182,6 +201,64 @@ ipcMain.handle('relaunch-app', () => {
   killSidecar();
   app.relaunch();
   app.exit(0);
+});
+
+// ── LingeeBridge IPC handlers ──
+
+// 同步：webview preload 启动时获取初始配置
+ipcMain.on('lingeeBridge:get-config', (event) => {
+  event.returnValue = currentBridgeConfig;
+});
+
+// 渲染进程推送配置变更 → 存储 + 广播到所有 webview
+ipcMain.handle('lingeeBridge:update-config', (event, config) => {
+  // 仅接受主窗口渲染进程的配置推送，拒绝 webview 侧的篡改
+  if (mainWindow && event.sender !== mainWindow.webContents) return { ok: false };
+  if (!config || typeof config !== 'object') return { ok: false };
+  // hostVersion 始终由主进程提供，避免渲染进程异步加载期间覆写为 'unknown'
+  currentBridgeConfig = { ...config, hostVersion: app.getVersion() };
+  broadcastToWebviews('lingeeBridge:config-changed', currentBridgeConfig);
+  return { ok: true };
+});
+
+// 在系统默认浏览器中打开 URL
+ipcMain.handle('lingeeBridge:open-link', async (_event, url) => {
+  if (!url || typeof url !== 'string') return;
+  // 安全校验：仅允许 http/https 协议，拒绝 file://、javascript:、自定义协议等
+  if (!url.startsWith('https://') && !url.startsWith('http://')) return;
+  await shell.openExternal(url);
+});
+
+// 写入系统剪贴板
+ipcMain.handle('lingeeBridge:copy-to-clipboard', (_event, text) => {
+  if (typeof text !== 'string') return false;
+  try {
+    clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    console.error('[LingeeBridge] clipboard write failed:', err);
+    return false;
+  }
+});
+
+// 接收 webview 上报的业务事件
+const KNOWN_BRIDGE_EVENTS = new Set(['ready', 'token-expired', 'navigation', 'error']);
+ipcMain.handle('lingeeBridge:notify', (_event, eventName, data) => {
+  if (!eventName || typeof eventName !== 'string') return { ok: false };
+  console.log(`[LingeeBridge] notify: ${eventName}`, data || '');
+
+  // 转发到渲染进程（UI 层可据此响应，如 token-expired → 重新登录）
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('lingeeBridge:webview-event', eventName, data);
+  }
+
+  // navigation 事件：可选更新窗口标题
+  if (eventName === 'navigation' && data?.title && mainWindow && !mainWindow.isDestroyed()) {
+    // 仅记录日志，标题栏由自定义 UI 管理
+    console.log(`[LingeeBridge] navigation: ${data.path} - ${data.title}`);
+  }
+
+  return { ok: KNOWN_BRIDGE_EVENTS.has(eventName) };
 });
 
 // Client auto-update IPC handlers
@@ -409,7 +486,9 @@ nativeTheme.themeSource = 'light';
 app.on('web-contents-created', (_, contents) => {
   contents.on('will-attach-webview', (_event, webPreferences, params) => {
     const src = params.src || '';
-    if (!src.startsWith('http://localhost') && !src.startsWith('http://127.0.0.1')) return;
+    // 仅对可信来源注入 preload：localhost / 127.0.0.1 / 内网 IP
+    const trustedPrefixes = ['http://localhost', 'http://127.0.0.1', 'http://172.20.'];
+    if (!trustedPrefixes.some(prefix => src.startsWith(prefix))) return;
     webPreferences.preload = path.join(__dirname, 'webview-preload.cjs');
     webPreferences.contextIsolation = true;
     webPreferences.nodeIntegration = false;
@@ -424,6 +503,9 @@ installEvents.on('progress', (data) => {
 });
 
 app.whenReady().then(() => {
+  // 初始化 bridge config 的 hostVersion
+  currentBridgeConfig.hostVersion = app.getVersion();
+
   // 自定义菜单，使 macOS 菜单栏显示正确的应用名称（必须在 app ready 之后）
   const appName = '金蝶灵基';
   if (process.platform === 'darwin') {
@@ -506,6 +588,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   forceQuit = true;
+  // 向所有 webview 发送停止信号，允许被嵌套端执行优雅退出
+  broadcastToWebviews('lingeeBridge:stop-requested');
   killSidecar();
 });
 

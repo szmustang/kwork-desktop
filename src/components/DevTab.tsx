@@ -42,6 +42,11 @@ function OpenCodeWebview({ serverUrl }: { serverUrl: string }) {
         `).catch(() => {})
       }
     }
+    const onConsole = (e: any) => {
+      const methods = ['log', 'warn', 'error', 'info', 'debug'] as const
+      const fn = methods[e.level] || 'log'
+      console[fn](`[DevTab:webview]`, e.message)
+    }
     // 等客户端路由跳转完成后再显示 webview
     const onNavigated = () => {
       console.log('[DevTab] webview did-stop-loading')
@@ -54,10 +59,12 @@ function OpenCodeWebview({ serverUrl }: { serverUrl: string }) {
     webview.addEventListener('dom-ready', onReady)
     webview.addEventListener('did-stop-loading', onNavigated)
     webview.addEventListener('did-fail-load', onFail)
+    webview.addEventListener('console-message', onConsole)
     return () => {
       webview.removeEventListener('dom-ready', onReady)
       webview.removeEventListener('did-stop-loading', onNavigated)
       webview.removeEventListener('did-fail-load', onFail)
+      webview.removeEventListener('console-message', onConsole)
     }
   }, [ready])
 

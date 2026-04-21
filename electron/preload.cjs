@@ -23,6 +23,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   openPath: (targetPath) => ipcRenderer.invoke('open-path', targetPath),
   oauth2Login: () => ipcRenderer.invoke('oauth2-login'),
+  // LingeeBridge: 渲染进程向主进程推送配置变更，主进程存储并广播到所有 webview
+  updateBridgeConfig: (config) => ipcRenderer.invoke('lingeeBridge:update-config', config),
+  // LingeeBridge: 监听 webview 上报的事件（主进程转发）
+  onWebviewEvent: (callback) => {
+    const listener = (_event, eventName, data) => callback(eventName, data);
+    ipcRenderer.on('lingeeBridge:webview-event', listener);
+    return () => ipcRenderer.removeListener('lingeeBridge:webview-event', listener);
+  },
   onInstallProgress: (callback) => {
     ipcRenderer.on('opencode-install-progress', (_event, progress) => callback(progress));
     return () => ipcRenderer.removeAllListeners('opencode-install-progress');
