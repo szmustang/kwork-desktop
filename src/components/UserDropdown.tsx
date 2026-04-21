@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { UserInfo } from './LoginPage'
+import appIcon from '../../build/icon.png'
 
 interface UserDropdownProps {
   user: UserInfo
@@ -7,9 +8,10 @@ interface UserDropdownProps {
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   appVersion: string
+  appName: string
 }
 
-export default function UserDropdown({ user, onLogout, theme, onToggleTheme, appVersion }: UserDropdownProps) {
+export default function UserDropdown({ user, onLogout, theme, onToggleTheme, appVersion, appName }: UserDropdownProps) {
   const [open, setOpen] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
 
@@ -95,25 +97,29 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
         <>
           <div className="about-dialog-overlay" onClick={() => setShowAbout(false)} />
           <div className="about-dialog">
+            <button className="about-dialog-close" onClick={() => setShowAbout(false)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
             <div className="about-dialog-content">
               <div className="about-logo">
-                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                  <rect width="48" height="48" rx="12" fill="#4F6EF7"/>
-                  <text x="24" y="30" textAnchor="middle" fill="white" fontSize="18" fontWeight="bold">K</text>
-                </svg>
+                <img src={appIcon} alt="Lingee" className="about-logo-img" />
                 <div className="about-logo-text">
-                  <span className="about-product-name">Lingee</span>
+                  <span className="about-product-name">{appName || 'Kingdee Lingee'}</span>
                 </div>
               </div>
-              {appVersion && <div className="about-version">版本号 {appVersion}</div>}
+              {appVersion && (
+                <div className="about-version-badge">v{appVersion}</div>
+              )}
               <div className="about-links">
                 <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">官网</a>
-                <span className="about-links-sep">|</span>
+                <span className="about-links-sep" />
                 <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">用户协议</a>
-                <span className="about-links-sep">|</span>
+                <span className="about-links-sep" />
                 <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">隐私政策</a>
               </div>
-              <button className="about-close-btn" onClick={() => setShowAbout(false)}>关闭</button>
+              <div className="about-copyright">Copyright &copy; 2026 Kingdee. All rights reserved.</div>
             </div>
           </div>
         </>

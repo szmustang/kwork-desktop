@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  getAppName: () => ipcRenderer.invoke('get-app-name'),
   getServerInfo: () => ipcRenderer.invoke('get-server-info'),
   killSidecar: () => ipcRenderer.invoke('kill-sidecar'),
   // Opencode management

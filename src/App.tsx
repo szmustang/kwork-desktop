@@ -241,10 +241,12 @@ function App() {
     return (localStorage.getItem('lingee-theme') as 'dark' | 'light') || 'light'
   })
   const [appVersion, setAppVersion] = useState('')
+  const [appName, setAppName] = useState('')
 
   useEffect(() => {
     const api = (window as any).electronAPI
     api?.getAppVersion?.().then((v: string) => setAppVersion(v || ''))
+    api?.getAppName?.().then((n: string) => setAppName(n || ''))
     // 设置平台 CSS 类，用于区分 macOS/Windows 布局
     if (api?.platform) {
       document.documentElement.setAttribute('data-platform', api.platform)
@@ -303,7 +305,7 @@ function App() {
         </nav>
 
         <div className="topbar-right">
-          <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} appVersion={appVersion} />
+          <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} appVersion={appVersion} appName={appName} />
         </div>
       </header>
 

@@ -79,6 +79,10 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
 
+ipcMain.handle('get-app-name', () => {
+  return app.name;
+});
+
 ipcMain.handle('get-server-info', async () => {
   try {
     await startSidecar();
