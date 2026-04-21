@@ -92,9 +92,9 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 1.5px;
-  background: linear-gradient(90deg, #f5e6f5 0%, #e8c8e8 15%, #d4a8d8 35%, #c8a0d0 50%, #d4a8d8 65%, #e8c8e8 85%, #f5e6f5 100%);
-  opacity: 0.8;
+  height: 1px;
+  background: var(--border-color, #e5e5e5);
+  opacity: 1;
 }
 
 [data-theme="dark"] .topbar {
@@ -266,7 +266,7 @@ body {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 1.5px solid #4caf50;
+  border: none;
   background: transparent;
   color: var(--text-primary);
   display: flex;
@@ -281,7 +281,14 @@ body {
 }
 .user-avatar-btn:hover,
 .user-avatar-btn.active {
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  opacity: 0.8;
+}
+
+.user-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .user-dropdown-panel {
