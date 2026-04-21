@@ -287,6 +287,42 @@ function App() {
     localStorage.setItem('lingee-theme', theme)
   }, [theme])
 
+  // ── LingeeBridge: 配置同步 ──
+  // 当 theme / user / appVersion 变化时，将完整 LingeeConfig 推送到主进程，主进程广播到所有 webview
+  useEffect(() => {
+    const api = (window as any).electronAPI
+    if (!api?.updateBridgeConfig) return
+    const langRaw = localStorage.getItem('lingee-lang') || 'zh'
+    const language = langRaw === 'en' ? 'en-US' : 'zh-CN'
+    api.updateBridgeConfig({
+      language,
+      theme,
+      auth: user ? {
+        token: user.token,
+        tenantId: user.tenantId,
+        tenantAccountId: user.tenantAccountId,
+        userId: user.userId,
+        role: user.role,
+        displayName: user.displayName,
+        expiresAt: user.expiresAt,
+      } : null,
+      hostVersion: appVersion || 'unknown',
+    })
+  }, [theme, user, appVersion])
+
+  // ── LingeeBridge: webview 事件监听 ──
+  useEffect(() => {
+    const api = (window as any).electronAPI
+    const removeWebviewEvent = api?.onWebviewEvent?.((eventName: string, data: any) => {
+      console.log('[App] Webview bridge event:', eventName, data)
+      if (eventName === 'token-expired') {
+        // webview 报告 token 过期 → 清除登录状态，显示登录页
+        handleLogout()
+      }
+    })
+    return () => removeWebviewEvent?.()
+  }, [handleLogout])
+
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
 
   // 未登录 → 显示登录页
