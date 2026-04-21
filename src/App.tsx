@@ -242,15 +242,18 @@ function App() {
   })
   const [appVersion, setAppVersion] = useState('')
   const [appName, setAppName] = useState('')
+  const [triggerAbout, setTriggerAbout] = useState(false)
 
   useEffect(() => {
     const api = (window as any).electronAPI
     api?.getAppVersion?.().then((v: string) => setAppVersion(v || ''))
     api?.getAppName?.().then((n: string) => setAppName(n || ''))
+    const cleanupAbout = api?.onShowAbout?.(() => setTriggerAbout(true))
     // 设置平台 CSS 类，用于区分 macOS/Windows 布局
     if (api?.platform) {
       document.documentElement.setAttribute('data-platform', api.platform)
     }
+    return () => { cleanupAbout?.() }
   }, [])
 
   // 登录状态管理
@@ -305,7 +308,7 @@ function App() {
         </nav>
 
         <div className="topbar-right">
-          <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} appVersion={appVersion} appName={appName} />
+          <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} appVersion={appVersion} appName={appName} externalShowAbout={triggerAbout} onAboutClosed={() => setTriggerAbout(false)} />
         </div>
       </header>
 

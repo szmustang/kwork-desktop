@@ -412,25 +412,67 @@ app.whenReady().then(() => {
   // 自定义菜单，使 macOS 菜单栏显示正确的应用名称（必须在 app ready 之后）
   const appName = '金蝶灵基';
   if (process.platform === 'darwin') {
+    const locale = app.getLocale(); // e.g. 'zh-CN', 'en-US'
+    const isChinese = locale.startsWith('zh');
+    const i18n = isChinese
+      ? { about: `关于 ${appName}`, hide: `隐藏 ${appName}`, hideOthers: '隐藏其他', unhide: '显示全部', quit: `退出 ${appName}`, services: '服务', file: '文件', edit: '编辑', view: '视图', window: '窗口' }
+      : { about: `About ${appName}`, hide: `Hide ${appName}`, hideOthers: 'Hide Others', unhide: 'Show All', quit: `Quit ${appName}`, services: 'Services', file: 'File', edit: 'Edit', view: 'View', window: 'Window' };
     const template = [
       {
         label: appName,
         submenu: [
-          { role: 'about', label: `About ${appName}` },
+          { label: i18n.about, click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('show-about'); } },
           { type: 'separator' },
-          { role: 'services' },
+          { role: 'services', label: i18n.services },
           { type: 'separator' },
-          { role: 'hide', label: `Hide ${appName}` },
-          { role: 'hideOthers' },
-          { role: 'unhide' },
+          { role: 'hide', label: i18n.hide },
+          { role: 'hideOthers', label: i18n.hideOthers },
+          { role: 'unhide', label: i18n.unhide },
           { type: 'separator' },
-          { role: 'quit', label: `Quit ${appName}` },
+          { role: 'quit', label: i18n.quit },
         ],
       },
-      { role: 'fileMenu' },
-      { role: 'editMenu' },
-      { role: 'viewMenu' },
-      { role: 'windowMenu' },
+      {
+        label: i18n.file,
+        submenu: [
+          { role: 'close', label: isChinese ? '关闭窗口' : 'Close Window' },
+        ],
+      },
+      {
+        label: i18n.edit,
+        submenu: [
+          { role: 'undo', label: isChinese ? '撤销' : 'Undo' },
+          { role: 'redo', label: isChinese ? '重做' : 'Redo' },
+          { type: 'separator' },
+          { role: 'cut', label: isChinese ? '剪切' : 'Cut' },
+          { role: 'copy', label: isChinese ? '拷贝' : 'Copy' },
+          { role: 'paste', label: isChinese ? '粘贴' : 'Paste' },
+          { role: 'selectAll', label: isChinese ? '全选' : 'Select All' },
+        ],
+      },
+      {
+        label: i18n.view,
+        submenu: [
+          { role: 'reload', label: isChinese ? '重新加载' : 'Reload' },
+          { role: 'forceReload', label: isChinese ? '强制重新加载' : 'Force Reload' },
+          { role: 'toggleDevTools', label: isChinese ? '开发者工具' : 'Toggle Developer Tools' },
+          { type: 'separator' },
+          { role: 'resetZoom', label: isChinese ? '实际大小' : 'Actual Size' },
+          { role: 'zoomIn', label: isChinese ? '放大' : 'Zoom In' },
+          { role: 'zoomOut', label: isChinese ? '缩小' : 'Zoom Out' },
+          { type: 'separator' },
+          { role: 'togglefullscreen', label: isChinese ? '进入全屏幕' : 'Toggle Full Screen' },
+        ],
+      },
+      {
+        label: i18n.window,
+        submenu: [
+          { role: 'minimize', label: isChinese ? '最小化' : 'Minimize' },
+          { role: 'zoom', label: isChinese ? '缩放' : 'Zoom' },
+          { type: 'separator' },
+          { role: 'front', label: isChinese ? '前置全部窗口' : 'Bring All to Front' },
+        ],
+      },
     ];
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
   }
