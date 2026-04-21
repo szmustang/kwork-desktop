@@ -207,9 +207,9 @@ ipcMain.handle('install-client-update', () => {
     // Bug fix 1: 用 wscript.exe 启动脚本，避免 spawn detached 子进程随父进程退出被杀
     // Bug fix 2: 脚本内自动检测写入权限，无权限时 UAC 提权
     const appDir = path.dirname(process.execPath);
-    const ps1Path = path.join(app.getPath('temp'), 'kwork-update.ps1');
-    const vbsPath = path.join(app.getPath('temp'), 'kwork-update.vbs');
-    const logPath = path.join(app.getPath('temp'), 'kwork-update.log');
+    const ps1Path = path.join(app.getPath('temp'), 'lingee-update.ps1');
+    const vbsPath = path.join(app.getPath('temp'), 'lingee-update.vbs');
+    const logPath = path.join(app.getPath('temp'), 'lingee-update.log');
     const script = [
       `$logFile = '${logPath.replace(/'/g, "''")}';`,
       `function Log($msg) { $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'; Add-Content -Path $logFile -Value "[$ts] $msg" }`,
@@ -233,7 +233,7 @@ ipcMain.handle('install-client-update', () => {
       `$zip = '${downloadedFilePath.replace(/'/g, "''")}';`,
       `Log "Zip file: $zip";`,
       `if (!(Test-Path $zip)) { Log 'ERROR: Zip file not found!'; exit 1 }`,
-      `$tmp = Join-Path $env:TEMP 'kwork-update-extract';`,
+      `$tmp = Join-Path $env:TEMP 'lingee-update-extract';`,
       `if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force };`,
       `try { Expand-Archive -Path $zip -DestinationPath $tmp -Force; Log 'Expand-Archive succeeded' } catch { Log "ERROR Expand-Archive: $_"; exit 1 }`,
       '',
@@ -282,7 +282,7 @@ ipcMain.handle('install-client-update', () => {
 });
 
 // 设置应用名称
-app.name = 'Kingdee KWork';
+app.name = '金蝶灵基';
 
 // 配置自动更新
 autoUpdater.setFeedURL({
@@ -398,7 +398,7 @@ installEvents.on('progress', (data) => {
 
 app.whenReady().then(() => {
   // 自定义菜单，使 macOS 菜单栏显示正确的应用名称（必须在 app ready 之后）
-  const appName = 'Kingdee KWork';
+  const appName = '金蝶灵基';
   if (process.platform === 'darwin') {
     const template = [
       {

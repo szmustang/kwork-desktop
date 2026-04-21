@@ -57,7 +57,7 @@ const i18n: Record<Lang, Record<string, string>> = {
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [lang, setLang] = useState<Lang>(() => {
-    return (localStorage.getItem('kwork-lang') as Lang) || 'zh'
+    return (localStorage.getItem('lingee-lang') as Lang) || 'zh'
   })
   const t = i18n[lang]
 
@@ -70,7 +70,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   const switchLang = (newLang: Lang) => {
     setLang(newLang)
-    localStorage.setItem('kwork-lang', newLang)
+    localStorage.setItem('lingee-lang', newLang)
     setError('')
   }
 
