@@ -4,6 +4,7 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents } = require('./sidecar.cjs');
+const { startOAuth2Login } = require('./oauth2.cjs');
 
 const devServerURL = process.env.VITE_DEV_SERVER_URL;
 
@@ -131,6 +132,21 @@ ipcMain.handle('start-sidecar', async () => {
     return { success: true, ...info };
   } catch (err) {
     return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('oauth2-login', async () => {
+  try {
+    const result = await startOAuth2Login();
+    // 登录成功后聚焦主窗口，用户无感从浏览器回到应用
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+    return { success: true, data: result };
+  } catch (err) {
+    // 返回 errorCode 供渲染进程映射 i18n，原始 message 仅供调试
+    return { success: false, errorCode: err.code || 'FAILED', error: err.message };
   }
 });
 

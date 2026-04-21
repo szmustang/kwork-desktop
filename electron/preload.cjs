@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleDevTools: () => ipcRenderer.invoke('toggle-devtools'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   openPath: (targetPath) => ipcRenderer.invoke('open-path', targetPath),
+  oauth2Login: () => ipcRenderer.invoke('oauth2-login'),
   onInstallProgress: (callback) => {
     ipcRenderer.on('opencode-install-progress', (_event, progress) => callback(progress));
     return () => ipcRenderer.removeAllListeners('opencode-install-progress');

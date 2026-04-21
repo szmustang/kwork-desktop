@@ -57,7 +57,7 @@
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08), 0 2px 12px rgba(0, 0, 0, 0.04);
-  padding: 40px 36px 32px;
+  padding: 40px 36px 8px;
   position: relative;
   -webkit-app-region: no-drag;
 }
@@ -192,12 +192,22 @@
   margin-top: -8px;
   margin-bottom: 8px;
   padding-left: 2px;
+  min-height: 20px;
+  overflow: hidden;
 }
 
 .login-error-icon {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
+}
+
+.login-error-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 /* 注册链接行 */
@@ -310,6 +320,11 @@
 .login-kdcloud-btn:hover {
   border-color: #1677ff;
   background: #f0f7ff;
+}
+.login-kdcloud-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .login-kdcloud-svg {

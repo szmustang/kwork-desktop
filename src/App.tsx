@@ -255,7 +255,15 @@ function App() {
   const [user, setUser] = useState<UserInfo | null>(() => {
     try {
       const stored = localStorage.getItem('kwork-user')
-      return stored ? JSON.parse(stored) : null
+      if (!stored) return null
+      const parsed: UserInfo = JSON.parse(stored)
+      // token 过期检查：若已过期则清除登录状态
+      if (parsed.expiresAt && Date.now() >= parsed.expiresAt) {
+        console.warn('[Auth] Token expired, clearing session')
+        localStorage.removeItem('kwork-user')
+        return null
+      }
+      return parsed
     } catch { return null }
   })
 
