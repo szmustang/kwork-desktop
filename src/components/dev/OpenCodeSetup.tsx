@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 /* ── Types for Electron IPC ── */
 
 interface ElectronOpenCodeAPI {
-  checkOpencode: () => Promise<{ installed: boolean }>
+  checkOpencode: () => Promise<{ installed: boolean; localVersion?: string | null; remoteVersion?: string | null }>
   getOpencodeVersion: () => Promise<{ version: string | null }>
   startSidecar: () => Promise<{ success: boolean; url?: string; error?: string }>
   installOpencode: () => Promise<{ success: boolean; error?: string }>

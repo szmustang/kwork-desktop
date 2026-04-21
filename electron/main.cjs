@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
-const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents } = require('./sidecar.cjs');
+const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, checkOpencodeUpToDate, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents } = require('./sidecar.cjs');
 
 const devServerURL = process.env.VITE_DEV_SERVER_URL;
 
@@ -85,8 +85,8 @@ ipcMain.handle('kill-sidecar', () => {
 });
 
 // Opencode management IPC
-ipcMain.handle('check-opencode', () => {
-  return { installed: isOpencodeInstalled() };
+ipcMain.handle('check-opencode', async () => {
+  return await checkOpencodeUpToDate();
 });
 
 ipcMain.handle('get-opencode-version', async () => {
