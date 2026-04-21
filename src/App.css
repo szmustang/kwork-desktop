@@ -92,8 +92,9 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 1px;
-  background: linear-gradient(90deg, #f0e0f0 0%, #e8d0e8 20%, #d8c8e8 50%, #e0d0e0 80%, #f0e0f0 100%);
+  height: 1.5px;
+  background: linear-gradient(90deg, #f5e6f5 0%, #e8c8e8 15%, #d4a8d8 35%, #c8a0d0 50%, #d4a8d8 65%, #e8c8e8 85%, #f5e6f5 100%);
+  opacity: 0.8;
 }
 
 [data-theme="dark"] .topbar {
@@ -244,6 +245,16 @@ body {
 }
 
 /* ===== 用户下拉菜单 ===== */
+.user-dropdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  -webkit-app-region: no-drag;
+}
+
 .user-dropdown-wrapper {
   position: relative;
   display: flex;
@@ -352,6 +363,167 @@ body {
 .user-dropdown-action:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+/* ===== 关于弹窗 ===== */
+.about-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 2000;
+  -webkit-app-region: no-drag;
+  backdrop-filter: blur(2px);
+}
+
+.about-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2001;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.06);
+  width: 360px;
+  padding: 36px 36px 28px;
+  animation: about-fade-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] .about-dialog {
+  background: #1e1e2e;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes about-fade-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.95); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.about-dialog-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.about-dialog-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.about-dialog-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.about-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.about-logo-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  object-fit: contain;
+}
+
+.about-logo-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.about-product-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.3px;
+}
+
+.about-product-subtitle {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.about-version-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 14px;
+  border: 1px solid var(--border-color, #e5e5e5);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+  background: var(--bg-tertiary, #f5f5f5);
+}
+
+[data-theme="dark"] .about-version-badge {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.about-links {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.about-links a {
+  color: #6366f1;
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.about-links a:hover {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+[data-theme="dark"] .about-links a {
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .about-links a:hover {
+  background: rgba(165, 180, 252, 0.1);
+}
+
+.about-links-sep {
+  width: 1px;
+  height: 12px;
+  background: var(--border-color, #e5e5e5);
+  flex-shrink: 0;
+}
+
+.about-copyright {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  letter-spacing: 0.2px;
 }
 
 /* ===== 主内容区 ===== */

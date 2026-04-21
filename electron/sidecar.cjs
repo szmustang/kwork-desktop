@@ -164,19 +164,6 @@ async function _doInstallOpencode() {
   const platformKey = getPlatformKey();
   console.log('[Sidecar] Installing opencode for platform:', platformKey);
 
-  // 清除旧的 opencode 二进制（如果存在），确保全新安装
-  const binDir = path.join(KCODE_DIR, 'bin');
-  const exeName = process.platform === 'win32' ? 'opencode.exe' : 'opencode';
-  const existingBin = path.join(binDir, exeName);
-  if (fs.existsSync(existingBin)) {
-    try {
-      fs.unlinkSync(existingBin);
-      console.log('[Sidecar] Removed existing opencode at', existingBin);
-    } catch (err) {
-      console.warn('[Sidecar] Failed to remove existing opencode:', err.message);
-    }
-  }
-
   // Update state: downloading
   installState.status = 'downloading';
   installState.progress = 0;
@@ -277,6 +264,50 @@ async function _doInstallOpencode() {
 function isOpencodeInstalled() {
   const binPath = getOpencodeBinPath();
   return fs.existsSync(binPath);
+}
+
+/**
+ * Check if opencode is installed AND up-to-date with CDN latest.json.
+ * If local version is outdated, delete old binary so installOpencode() can fetch the latest.
+ * Returns { installed: boolean, localVersion, remoteVersion }
+ */
+async function checkOpencodeUpToDate() {
+  const binPath = getOpencodeBinPath();
+  const exists = fs.existsSync(binPath);
+
+  // 1. Fetch CDN latest version
+  let remoteVersion = null;
+  try {
+    const latest = await fetchJson(`${CDN_BASE}/latest.json`);
+    remoteVersion = latest.version || null;
+  } catch (err) {
+    console.warn('[Sidecar] CDN version check failed:', err.message);
+    // CDN unreachable: if binary exists, use it; if not, caller will trigger install
+    return { installed: exists, localVersion: null, remoteVersion: null };
+  }
+
+  // 2. Get local version
+  let localVersion = null;
+  if (exists) {
+    localVersion = await getOpencodeVersion();
+  }
+
+  // 3. Compare: needs update if not installed, version unknown, or outdated
+  const needsUpdate = !exists || !localVersion || !remoteVersion
+    || compareVersions(remoteVersion, localVersion) > 0;
+
+  if (needsUpdate && exists) {
+    // Delete outdated binary so installOpencode() will download the latest
+    try {
+      fs.unlinkSync(binPath);
+      console.log('[Sidecar] Removed outdated opencode v' + localVersion + ' (CDN has v' + remoteVersion + ')');
+    } catch (err) {
+      console.warn('[Sidecar] Failed to remove old binary:', err.message);
+    }
+  }
+
+  console.log('[Sidecar] checkUpToDate: local=' + localVersion + ' remote=' + remoteVersion + ' needsUpdate=' + needsUpdate);
+  return { installed: !needsUpdate, localVersion, remoteVersion };
 }
 
 /**
@@ -794,6 +825,7 @@ module.exports = {
   killSidecar,
   getServerInfo,
   isOpencodeInstalled,
+  checkOpencodeUpToDate,
   getOpencodeVersion,
   applyPendingUpdate,
   checkPendingUpdate,

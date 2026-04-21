@@ -79,7 +79,7 @@ const i18n: Record<Lang, Record<string, string>> = {
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [lang, setLang] = useState<Lang>(() => {
-    return (localStorage.getItem('kwork-lang') as Lang) || 'zh'
+    return (localStorage.getItem('lingee-lang') as Lang) || 'zh'
   })
   const t = i18n[lang]
 
@@ -87,14 +87,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
-  const [agreed, setAgreed] = useState(false)
+  const [agreed, setAgreed] = useState(true)
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState(false)
   const [oauthError, setOauthError] = useState('')
 
   const switchLang = (newLang: Lang) => {
     setLang(newLang)
-    localStorage.setItem('kwork-lang', newLang)
+    localStorage.setItem('lingee-lang', newLang)
     setError('')
   }
 
@@ -102,14 +102,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     e.preventDefault()
     setError('')
 
-    if (!account.trim()) {
-      setError(t.errAccount)
-      return
-    }
-    if (!password.trim()) {
-      setError(t.errPassword)
-      return
-    }
     if (!agreed) {
       setError(t.errAgreement)
       return

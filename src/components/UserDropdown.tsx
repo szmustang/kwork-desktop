@@ -1,33 +1,36 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import type { UserInfo } from './LoginPage'
+import appIcon from '../../build/icon.png'
 
 interface UserDropdownProps {
   user: UserInfo
   onLogout: () => void
   theme: 'dark' | 'light'
   onToggleTheme: () => void
+  appVersion: string
+  appName: string
+  externalShowAbout?: boolean
+  onAboutClosed?: () => void
 }
 
-export default function UserDropdown({ user, onLogout, theme, onToggleTheme }: UserDropdownProps) {
+export default function UserDropdown({ user, onLogout, theme, onToggleTheme, appVersion, appName, externalShowAbout, onAboutClosed }: UserDropdownProps) {
   const [open, setOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [showAbout, setShowAbout] = useState(false)
 
-  // 点击外部关闭
   useEffect(() => {
-    if (!open) return
-    const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
+    if (externalShowAbout) {
+      setShowAbout(true)
+      onAboutClosed?.()
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
+  }, [externalShowAbout])
 
   const initials = user.displayName.charAt(0).toUpperCase()
 
   return (
-    <div className="user-dropdown-wrapper" ref={dropdownRef}>
+    <div className="user-dropdown-wrapper">
+      {/* 全屏透明遮罩：点击任意位置关闭下拉面板 */}
+      {open && <div className="user-dropdown-overlay" onClick={() => setOpen(false)} />}
+
       {/* 文件夹图标 */}
       <button className="topbar-icon-btn" title="文件">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -78,6 +81,14 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme }: U
             </svg>
             <span>开发者工具</span>
           </button>
+          <button className="user-dropdown-action" onClick={() => { setOpen(false); setShowAbout(true); }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span>关于</span>
+          </button>
           <div className="user-dropdown-divider" />
           <button className="user-dropdown-logout" onClick={onLogout}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -88,6 +99,39 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme }: U
             <span>退出登录</span>
           </button>
         </div>
+      )}
+
+      {/* 关于弹窗 */}
+      {showAbout && (
+        <>
+          <div className="about-dialog-overlay" onClick={() => setShowAbout(false)} />
+          <div className="about-dialog">
+            <button className="about-dialog-close" onClick={() => setShowAbout(false)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+            <div className="about-dialog-content">
+              <div className="about-logo">
+                <img src={appIcon} alt="Lingee" className="about-logo-img" />
+                <div className="about-logo-text">
+                  <span className="about-product-name">{appName || 'Kingdee Lingee'}</span>
+                </div>
+              </div>
+              {appVersion && (
+                <div className="about-version-badge">v{appVersion}</div>
+              )}
+              <div className="about-links">
+                <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">官网</a>
+                <span className="about-links-sep" />
+                <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">用户协议</a>
+                <span className="about-links-sep" />
+                <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">隐私政策</a>
+              </div>
+              <div className="about-copyright">Copyright &copy; 2026 Kingdee. All rights reserved.</div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

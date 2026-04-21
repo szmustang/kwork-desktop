@@ -3,9 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
-const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents } = require('./sidecar.cjs');
+const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, checkOpencodeUpToDate, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents } = require('./sidecar.cjs');
 const { startOAuth2Login } = require('./oauth2.cjs');
-
 const devServerURL = process.env.VITE_DEV_SERVER_URL;
 
 // 禁止 macOS 恢复上次窗口状态（最小化/隐藏记忆），这是打包后窗口不弹出的根本原因
@@ -65,11 +64,23 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+
+  // 拦截外部链接，用系统默认浏览器打开
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      require('electron').shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
 }
 
 // IPC handlers
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
+});
+
+ipcMain.handle('get-app-name', () => {
+  return app.name;
 });
 
 ipcMain.handle('get-server-info', async () => {
@@ -86,8 +97,8 @@ ipcMain.handle('kill-sidecar', () => {
 });
 
 // Opencode management IPC
-ipcMain.handle('check-opencode', () => {
-  return { installed: isOpencodeInstalled() };
+ipcMain.handle('check-opencode', async () => {
+  return await checkOpencodeUpToDate();
 });
 
 ipcMain.handle('get-opencode-version', async () => {
@@ -223,9 +234,9 @@ ipcMain.handle('install-client-update', () => {
     // Bug fix 1: 用 wscript.exe 启动脚本，避免 spawn detached 子进程随父进程退出被杀
     // Bug fix 2: 脚本内自动检测写入权限，无权限时 UAC 提权
     const appDir = path.dirname(process.execPath);
-    const ps1Path = path.join(app.getPath('temp'), 'kwork-update.ps1');
-    const vbsPath = path.join(app.getPath('temp'), 'kwork-update.vbs');
-    const logPath = path.join(app.getPath('temp'), 'kwork-update.log');
+    const ps1Path = path.join(app.getPath('temp'), 'lingee-update.ps1');
+    const vbsPath = path.join(app.getPath('temp'), 'lingee-update.vbs');
+    const logPath = path.join(app.getPath('temp'), 'lingee-update.log');
     const script = [
       `$logFile = '${logPath.replace(/'/g, "''")}';`,
       `function Log($msg) { $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'; Add-Content -Path $logFile -Value "[$ts] $msg" }`,
@@ -249,7 +260,7 @@ ipcMain.handle('install-client-update', () => {
       `$zip = '${downloadedFilePath.replace(/'/g, "''")}';`,
       `Log "Zip file: $zip";`,
       `if (!(Test-Path $zip)) { Log 'ERROR: Zip file not found!'; exit 1 }`,
-      `$tmp = Join-Path $env:TEMP 'kwork-update-extract';`,
+      `$tmp = Join-Path $env:TEMP 'lingee-update-extract';`,
       `if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force };`,
       `try { Expand-Archive -Path $zip -DestinationPath $tmp -Force; Log 'Expand-Archive succeeded' } catch { Log "ERROR Expand-Archive: $_"; exit 1 }`,
       '',
@@ -298,7 +309,7 @@ ipcMain.handle('install-client-update', () => {
 });
 
 // 设置应用名称
-app.name = 'Kingdee KWork';
+app.name = '金蝶灵基';
 
 // 配置自动更新
 autoUpdater.setFeedURL({
@@ -414,27 +425,69 @@ installEvents.on('progress', (data) => {
 
 app.whenReady().then(() => {
   // 自定义菜单，使 macOS 菜单栏显示正确的应用名称（必须在 app ready 之后）
-  const appName = 'Kingdee KWork';
+  const appName = '金蝶灵基';
   if (process.platform === 'darwin') {
+    const locale = app.getLocale(); // e.g. 'zh-CN', 'en-US'
+    const isChinese = locale.startsWith('zh');
+    const i18n = isChinese
+      ? { about: `关于 ${appName}`, hide: `隐藏 ${appName}`, hideOthers: '隐藏其他', unhide: '显示全部', quit: `退出 ${appName}`, services: '服务', file: '文件', edit: '编辑', view: '视图', window: '窗口' }
+      : { about: `About ${appName}`, hide: `Hide ${appName}`, hideOthers: 'Hide Others', unhide: 'Show All', quit: `Quit ${appName}`, services: 'Services', file: 'File', edit: 'Edit', view: 'View', window: 'Window' };
     const template = [
       {
         label: appName,
         submenu: [
-          { role: 'about', label: `About ${appName}` },
+          { label: i18n.about, click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('show-about'); } },
           { type: 'separator' },
-          { role: 'services' },
+          { role: 'services', label: i18n.services },
           { type: 'separator' },
-          { role: 'hide', label: `Hide ${appName}` },
-          { role: 'hideOthers' },
-          { role: 'unhide' },
+          { role: 'hide', label: i18n.hide },
+          { role: 'hideOthers', label: i18n.hideOthers },
+          { role: 'unhide', label: i18n.unhide },
           { type: 'separator' },
-          { role: 'quit', label: `Quit ${appName}` },
+          { role: 'quit', label: i18n.quit },
         ],
       },
-      { role: 'fileMenu' },
-      { role: 'editMenu' },
-      { role: 'viewMenu' },
-      { role: 'windowMenu' },
+      {
+        label: i18n.file,
+        submenu: [
+          { role: 'close', label: isChinese ? '关闭窗口' : 'Close Window' },
+        ],
+      },
+      {
+        label: i18n.edit,
+        submenu: [
+          { role: 'undo', label: isChinese ? '撤销' : 'Undo' },
+          { role: 'redo', label: isChinese ? '重做' : 'Redo' },
+          { type: 'separator' },
+          { role: 'cut', label: isChinese ? '剪切' : 'Cut' },
+          { role: 'copy', label: isChinese ? '拷贝' : 'Copy' },
+          { role: 'paste', label: isChinese ? '粘贴' : 'Paste' },
+          { role: 'selectAll', label: isChinese ? '全选' : 'Select All' },
+        ],
+      },
+      {
+        label: i18n.view,
+        submenu: [
+          { role: 'reload', label: isChinese ? '重新加载' : 'Reload' },
+          { role: 'forceReload', label: isChinese ? '强制重新加载' : 'Force Reload' },
+          { role: 'toggleDevTools', label: isChinese ? '开发者工具' : 'Toggle Developer Tools' },
+          { type: 'separator' },
+          { role: 'resetZoom', label: isChinese ? '实际大小' : 'Actual Size' },
+          { role: 'zoomIn', label: isChinese ? '放大' : 'Zoom In' },
+          { role: 'zoomOut', label: isChinese ? '缩小' : 'Zoom Out' },
+          { type: 'separator' },
+          { role: 'togglefullscreen', label: isChinese ? '进入全屏幕' : 'Toggle Full Screen' },
+        ],
+      },
+      {
+        label: i18n.window,
+        submenu: [
+          { role: 'minimize', label: isChinese ? '最小化' : 'Minimize' },
+          { role: 'zoom', label: isChinese ? '缩放' : 'Zoom' },
+          { type: 'separator' },
+          { role: 'front', label: isChinese ? '前置全部窗口' : 'Bring All to Front' },
+        ],
+      },
     ];
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
   }

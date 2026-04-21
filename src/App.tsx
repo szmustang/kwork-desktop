@@ -216,7 +216,7 @@ function UpdateToast() {
           ) : isClientDownloaded ? (
             <p>下载完成，点击「重启安装」应用更新</p>
           ) : (
-            <p>{isOpencode ? 'Kingdee Code' : 'Kingdee KWork'} 有新版本可用，是否立即更新？</p>
+            <p>{isOpencode ? 'Kingdee Code' : 'Kingdee Lingee'} 有新版本可用，是否立即更新？</p>
           )}
         </div>
       </div>
@@ -238,29 +238,34 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('chat')
   const openCodeSetup = useOpenCodeSetup()
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('kwork-theme') as 'dark' | 'light') || 'light'
+    return (localStorage.getItem('lingee-theme') as 'dark' | 'light') || 'light'
   })
   const [appVersion, setAppVersion] = useState('')
+  const [appName, setAppName] = useState('')
+  const [triggerAbout, setTriggerAbout] = useState(false)
 
   useEffect(() => {
     const api = (window as any).electronAPI
     api?.getAppVersion?.().then((v: string) => setAppVersion(v || ''))
+    api?.getAppName?.().then((n: string) => setAppName(n || ''))
+    const cleanupAbout = api?.onShowAbout?.(() => setTriggerAbout(true))
     // 设置平台 CSS 类，用于区分 macOS/Windows 布局
     if (api?.platform) {
       document.documentElement.setAttribute('data-platform', api.platform)
     }
+    return () => { cleanupAbout?.() }
   }, [])
 
   // 登录状态管理
   const [user, setUser] = useState<UserInfo | null>(() => {
     try {
-      const stored = localStorage.getItem('kwork-user')
+      const stored = localStorage.getItem('lingee-user')
       if (!stored) return null
       const parsed: UserInfo = JSON.parse(stored)
       // token 过期检查：若已过期则清除登录状态
       if (parsed.expiresAt && Date.now() >= parsed.expiresAt) {
         console.warn('[Auth] Token expired, clearing session')
-        localStorage.removeItem('kwork-user')
+        localStorage.removeItem('lingee-user')
         return null
       }
       return parsed
@@ -268,18 +273,18 @@ function App() {
   })
 
   const handleLogin = useCallback((userInfo: UserInfo) => {
-    localStorage.setItem('kwork-user', JSON.stringify(userInfo))
+    localStorage.setItem('lingee-user', JSON.stringify(userInfo))
     setUser(userInfo)
   }, [])
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('kwork-user')
+    localStorage.removeItem('lingee-user')
     setUser(null)
   }, [])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('kwork-theme', theme)
+    localStorage.setItem('lingee-theme', theme)
   }, [theme])
 
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
@@ -294,7 +299,9 @@ function App() {
     <div className="app">
       {/* 顶部导航栏 */}
       <header className="topbar">
-        <div className="topbar-left" />
+        <div className="topbar-left">
+                                    <span className="logo-text"></span>
+                </div>
 
         <nav className="topbar-tabs">
           {tabs.map((tab) => (
@@ -309,8 +316,7 @@ function App() {
         </nav>
 
         <div className="topbar-right">
-          <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
-          {appVersion && <span className="app-version">v{appVersion}</span>}
+          <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} appVersion={appVersion} appName={appName} externalShowAbout={triggerAbout} onAboutClosed={() => setTriggerAbout(false)} />
         </div>
       </header>
 

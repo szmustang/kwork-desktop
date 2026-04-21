@@ -1,9 +1,9 @@
 {
-  "name": "kingdee-kwork",
-  "productName": "Kingdee KWork",
+  "name": "kingdee-lingee",
+  "productName": "Kingdee Lingee",
   "private": true,
-  "version": "0.0.21",
-  "description": "Kingdee KWork Desktop Client",
+  "version": "0.0.27",
+  "description": "Kingdee Lingee Desktop Client",
   "author": "Kingdee",
   "main": "electron/main.cjs",
   "type": "module",
@@ -21,8 +21,8 @@
     "preview": "vite preview" 
   },
   "build": {
-    "appId": "com.kingdee.kwork",
-    "productName": "Kingdee KWork",
+    "appId": "com.Kingdee.lingee",
+    "productName": "Kingdee Lingee",
     "directories": {
       "output": "release"
     },
@@ -33,6 +33,24 @@
       "!electron/data/**/*"
     ],
     "mac": {
+      "electronLanguages": ["en", "zh_CN", "zh-Hans"],
+      "extraResources": [
+        {
+          "from": "build/mac/en.lproj",
+          "to": "en.lproj"
+        },
+        {
+          "from": "build/mac/zh_CN.lproj",
+          "to": "zh_CN.lproj"
+        },
+        {
+          "from": "build/mac/zh-Hans.lproj",
+          "to": "zh-Hans.lproj"
+        }
+      ],
+      "extendInfo": {
+        "CFBundleDisplayName": "金蝶灵基"
+      },
       "category": "public.app-category.developer-tools",
       "target": [
         "dmg",
