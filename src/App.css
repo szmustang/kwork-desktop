@@ -92,8 +92,9 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 1px;
-  background: linear-gradient(90deg, #f0e0f0 0%, #e8d0e8 20%, #d8c8e8 50%, #e0d0e0 80%, #f0e0f0 100%);
+  height: 1.5px;
+  background: linear-gradient(90deg, #f5e6f5 0%, #e8c8e8 15%, #d4a8d8 35%, #c8a0d0 50%, #d4a8d8 65%, #e8c8e8 85%, #f5e6f5 100%);
+  opacity: 0.8;
 }
 
 [data-theme="dark"] .topbar {
@@ -244,6 +245,16 @@ body {
 }
 
 /* ===== 用户下拉菜单 ===== */
+.user-dropdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  -webkit-app-region: no-drag;
+}
+
 .user-dropdown-wrapper {
   position: relative;
   display: flex;
@@ -352,6 +363,106 @@ body {
 .user-dropdown-action:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+/* ===== 关于弹窗 ===== */
+.about-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 2000;
+  -webkit-app-region: no-drag;
+}
+
+.about-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2001;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  width: 380px;
+  padding: 48px 40px 36px;
+  animation: about-fade-in 0.2s ease;
+}
+
+[data-theme="dark"] .about-dialog {
+  background: var(--bg-secondary);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes about-fade-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.about-dialog-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.about-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.about-product-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.about-version {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.about-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.about-links a {
+  color: #4F6EF7;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.about-links a:hover {
+  opacity: 0.7;
+  text-decoration: underline;
+}
+
+.about-links-sep {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.about-close-btn {
+  margin-top: 8px;
+  padding: 8px 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.about-close-btn:hover {
+  background: var(--bg-hover);
 }
 
 /* ===== 主内容区 ===== */

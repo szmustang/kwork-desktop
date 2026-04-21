@@ -286,7 +286,9 @@ function App() {
     <div className="app">
       {/* 顶部导航栏 */}
       <header className="topbar">
-        <div className="topbar-left" />
+        <div className="topbar-left">
+                  <span className="logo-text">Kwork</span>
+                </div>
 
         <nav className="topbar-tabs">
           {tabs.map((tab) => (
@@ -301,8 +303,7 @@ function App() {
         </nav>
 
         <div className="topbar-right">
-          <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
-          {appVersion && <span className="app-version">v{appVersion}</span>}
+          <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} appVersion={appVersion} />
         </div>
       </header>
 

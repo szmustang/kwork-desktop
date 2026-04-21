@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import type { UserInfo } from './LoginPage'
 
 interface UserDropdownProps {
@@ -6,28 +6,20 @@ interface UserDropdownProps {
   onLogout: () => void
   theme: 'dark' | 'light'
   onToggleTheme: () => void
+  appVersion: string
 }
 
-export default function UserDropdown({ user, onLogout, theme, onToggleTheme }: UserDropdownProps) {
+export default function UserDropdown({ user, onLogout, theme, onToggleTheme, appVersion }: UserDropdownProps) {
   const [open, setOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  // 点击外部关闭
-  useEffect(() => {
-    if (!open) return
-    const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
+  const [showAbout, setShowAbout] = useState(false)
 
   const initials = user.displayName.charAt(0).toUpperCase()
 
   return (
-    <div className="user-dropdown-wrapper" ref={dropdownRef}>
+    <div className="user-dropdown-wrapper">
+      {/* 全屏透明遮罩：点击任意位置关闭下拉面板 */}
+      {open && <div className="user-dropdown-overlay" onClick={() => setOpen(false)} />}
+
       {/* 文件夹图标 */}
       <button className="topbar-icon-btn" title="文件">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -78,6 +70,14 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme }: U
             </svg>
             <span>开发者工具</span>
           </button>
+          <button className="user-dropdown-action" onClick={() => { setOpen(false); setShowAbout(true); }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span>关于</span>
+          </button>
           <div className="user-dropdown-divider" />
           <button className="user-dropdown-logout" onClick={onLogout}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -88,6 +88,35 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme }: U
             <span>退出登录</span>
           </button>
         </div>
+      )}
+
+      {/* 关于弹窗 */}
+      {showAbout && (
+        <>
+          <div className="about-dialog-overlay" onClick={() => setShowAbout(false)} />
+          <div className="about-dialog">
+            <div className="about-dialog-content">
+              <div className="about-logo">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                  <rect width="48" height="48" rx="12" fill="#4F6EF7"/>
+                  <text x="24" y="30" textAnchor="middle" fill="white" fontSize="18" fontWeight="bold">K</text>
+                </svg>
+                <div className="about-logo-text">
+                  <span className="about-product-name">KWork</span>
+                </div>
+              </div>
+              {appVersion && <div className="about-version">版本号 {appVersion}</div>}
+              <div className="about-links">
+                <a href="https://www.yunzhijia.com" target="_blank" rel="noopener noreferrer">官网</a>
+                <span className="about-links-sep">|</span>
+                <a href="https://www.yunzhijia.com/agreement" target="_blank" rel="noopener noreferrer">用户协议</a>
+                <span className="about-links-sep">|</span>
+                <a href="https://www.yunzhijia.com/privacy" target="_blank" rel="noopener noreferrer">隐私政策</a>
+              </div>
+              <button className="about-close-btn" onClick={() => setShowAbout(false)}>关闭</button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
