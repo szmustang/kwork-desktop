@@ -163,18 +163,22 @@
   color: #666;
 }
 
-.login-forgot-link {
-  font-size: 13px;
-  color: #666;
-  text-decoration: none;
+.login-eye-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #bbb;
   cursor: pointer;
-  white-space: nowrap;
-  padding: 4px 6px;
-  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
   transition: color 0.15s;
 }
-.login-forgot-link:hover {
-  color: #1677ff;
+.login-eye-btn:hover {
+  color: #666;
 }
 
 /* 错误状态 */
