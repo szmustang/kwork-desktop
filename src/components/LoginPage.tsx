@@ -102,51 +102,37 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     e.preventDefault()
     setError('')
 
-    // 暂时跳过登录校验，直接进入主界面
-    const user: UserInfo = {
-      username: account.trim() || 'guest',
-      displayName: account.trim() || 'Guest',
-      role: 'User',
-      token: '',
-      tenantId: '',
-      tenantAccountId: '',
-      userId: '',
-      expiresAt: Date.now() + 86400000,
+    if (!agreed) {
+      setError(t.errAgreement)
+      return
     }
-    onLogin(user)
 
-    // --- 原始登录逻辑（暂时屏蔽）---
-    // if (!agreed) {
-    //   setError(t.errAgreement)
-    //   return
-    // }
-    //
-    // setLoading(true)
-    // try {
-    //   const res = await login({
-    //     username: account.trim(),
-    //     password: password.trim(),
-    //   })
-    //   const user: UserInfo = {
-    //     username: account.trim(),
-    //     displayName: res.displayName,
-    //     role: res.role,
-    //     token: res.token,
-    //     tenantId: res.tenantId,
-    //     tenantAccountId: res.tenantAccountId,
-    //     userId: res.userId,
-    //     expiresAt: res.expiresAt,
-    //   }
-    //   onLogin(user)
-    // } catch (err) {
-    //   if (err instanceof AuthError) {
-    //     setError(`${t.errLoginFailed}：${err.message}`)
-    //   } else {
-    //     setError(t.errNetwork)
-    //   }
-    // } finally {
-    //   setLoading(false)
-    // }
+    setLoading(true)
+    try {
+      const res = await login({
+        username: account.trim(),
+        password: password.trim(),
+      })
+      const user: UserInfo = {
+        username: account.trim(),
+        displayName: res.displayName,
+        role: res.role,
+        token: res.token,
+        tenantId: res.tenantId,
+        tenantAccountId: res.tenantAccountId,
+        userId: res.userId,
+        expiresAt: res.expiresAt,
+      }
+      onLogin(user)
+    } catch (err) {
+      if (err instanceof AuthError) {
+        setError(`${t.errLoginFailed}：${err.message}`)
+      } else {
+        setError(t.errNetwork)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleKdcloudLogin = async () => {

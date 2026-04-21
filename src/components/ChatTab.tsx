@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 
-const CHAT_URL = 'http://172.20.213.28:5173/chatbot/new'
+const CHAT_URL = 'https://devtest.kingdee.com/chatbot/new'
 
 export default function ChatTab() {
   const webviewRef = useRef<HTMLWebViewElement>(null)

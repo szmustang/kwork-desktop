@@ -487,7 +487,7 @@ app.on('web-contents-created', (_, contents) => {
   contents.on('will-attach-webview', (_event, webPreferences, params) => {
     const src = params.src || '';
     // 仅对可信来源注入 preload：localhost / 127.0.0.1 / 内网 IP
-    const trustedPrefixes = ['http://localhost', 'http://127.0.0.1', 'http://172.20.'];
+    const trustedPrefixes = ['http://localhost', 'http://127.0.0.1', 'http://172.20.', 'https://devtest.kingdee.com'];
     if (!trustedPrefixes.some(prefix => src.startsWith(prefix))) return;
     webPreferences.preload = path.join(__dirname, 'webview-preload.cjs');
     webPreferences.contextIsolation = true;

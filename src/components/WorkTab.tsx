@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 
-const WORK_URL = 'http://172.20.213.28:5173/session/new'
+const WORK_URL = 'https://devtest.kingdee.com/session/new'
 
 export default function WorkTab() {
   const webviewRef = useRef<HTMLWebViewElement>(null)
