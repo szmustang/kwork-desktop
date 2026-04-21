@@ -266,7 +266,7 @@ body {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  border: 1.5px solid #4caf50;
+  border: none;
   background: transparent;
   color: var(--text-primary);
   display: flex;
@@ -281,7 +281,14 @@ body {
 }
 .user-avatar-btn:hover,
 .user-avatar-btn.active {
-  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+  opacity: 0.8;
+}
+
+.user-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .user-dropdown-panel {

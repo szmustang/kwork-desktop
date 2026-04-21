@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { UserInfo } from './LoginPage'
 import appIcon from '../../build/icon.png'
+import defaultAvatar from '../assets/linggeeuser.jpg'
 
 interface UserDropdownProps {
   user: UserInfo
@@ -51,7 +52,7 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
         className={`user-avatar-btn ${open ? 'active' : ''}`}
         onClick={() => setOpen(!open)}
       >
-        {initials}
+        <img src={defaultAvatar} alt={initials} className="user-avatar-img" />
       </div>
 
       {/* 下拉面板 */}
