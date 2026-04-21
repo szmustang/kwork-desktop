@@ -107,11 +107,11 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
               </div>
               {appVersion && <div className="about-version">版本号 {appVersion}</div>}
               <div className="about-links">
-                <a href="https://www.yunzhijia.com" target="_blank" rel="noopener noreferrer">官网</a>
+                <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">官网</a>
                 <span className="about-links-sep">|</span>
-                <a href="https://www.yunzhijia.com/agreement" target="_blank" rel="noopener noreferrer">用户协议</a>
+                <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">用户协议</a>
                 <span className="about-links-sep">|</span>
-                <a href="https://www.yunzhijia.com/privacy" target="_blank" rel="noopener noreferrer">隐私政策</a>
+                <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">隐私政策</a>
               </div>
               <button className="about-close-btn" onClick={() => setShowAbout(false)}>关闭</button>
             </div>

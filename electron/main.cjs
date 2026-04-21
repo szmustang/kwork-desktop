@@ -64,6 +64,14 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+
+  // 拦截外部链接，用系统默认浏览器打开
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      require('electron').shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
 }
 
 // IPC handlers
