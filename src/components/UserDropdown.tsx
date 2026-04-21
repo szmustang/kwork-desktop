@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { UserInfo } from './LoginPage'
 import appIcon from '../../build/icon.png'
 
@@ -9,11 +9,20 @@ interface UserDropdownProps {
   onToggleTheme: () => void
   appVersion: string
   appName: string
+  externalShowAbout?: boolean
+  onAboutClosed?: () => void
 }
 
-export default function UserDropdown({ user, onLogout, theme, onToggleTheme, appVersion, appName }: UserDropdownProps) {
+export default function UserDropdown({ user, onLogout, theme, onToggleTheme, appVersion, appName, externalShowAbout, onAboutClosed }: UserDropdownProps) {
   const [open, setOpen] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
+
+  useEffect(() => {
+    if (externalShowAbout) {
+      setShowAbout(true)
+      onAboutClosed?.()
+    }
+  }, [externalShowAbout])
 
   const initials = user.displayName.charAt(0).toUpperCase()
 
