@@ -1,9 +1,9 @@
 {
-  "name": "kingdee-kwork",
-  "productName": "Kingdee KWork",
+  "name": "kingdee-lingee",
+  "productName": "Kingdee Lingee",
   "private": true,
-  "version": "0.0.22",
-  "description": "Kingdee KWork Desktop Client",
+  "version": "0.0.25",
+  "description": "Kingdee Lingee Desktop Client",
   "author": "Kingdee",
   "main": "electron/main.cjs",
   "type": "module",
@@ -21,8 +21,8 @@
     "preview": "vite preview" 
   },
   "build": {
-    "appId": "com.kingdee.kwork",
-    "productName": "Kingdee KWork",
+    "appId": "com.Kingdee.lingee",
+    "productName": "Kingdee Lingee",
     "directories": {
       "output": "release"
     },
@@ -33,6 +33,7 @@
       "!electron/data/**/*"
     ],
     "mac": {
+      "electronLanguages": ["en", "zh_CN", "zh-Hans"],
       "category": "public.app-category.developer-tools",
       "target": [
         "dmg",

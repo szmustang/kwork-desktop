@@ -216,7 +216,7 @@ function UpdateToast() {
           ) : isClientDownloaded ? (
             <p>下载完成，点击「重启安装」应用更新</p>
           ) : (
-            <p>{isOpencode ? 'Kingdee Code' : 'Kingdee KWork'} 有新版本可用，是否立即更新？</p>
+            <p>{isOpencode ? 'Kingdee Code' : 'Kingdee Lingee'} 有新版本可用，是否立即更新？</p>
           )}
         </div>
       </div>
@@ -238,7 +238,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabKey>('chat')
   const openCodeSetup = useOpenCodeSetup()
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('kwork-theme') as 'dark' | 'light') || 'light'
+    return (localStorage.getItem('lingee-theme') as 'dark' | 'light') || 'light'
   })
   const [appVersion, setAppVersion] = useState('')
 
@@ -254,24 +254,24 @@ function App() {
   // 登录状态管理
   const [user, setUser] = useState<UserInfo | null>(() => {
     try {
-      const stored = localStorage.getItem('kwork-user')
+      const stored = localStorage.getItem('lingee-user')
       return stored ? JSON.parse(stored) : null
     } catch { return null }
   })
 
   const handleLogin = useCallback((userInfo: UserInfo) => {
-    localStorage.setItem('kwork-user', JSON.stringify(userInfo))
+    localStorage.setItem('lingee-user', JSON.stringify(userInfo))
     setUser(userInfo)
   }, [])
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('kwork-user')
+    localStorage.removeItem('lingee-user')
     setUser(null)
   }, [])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('kwork-theme', theme)
+    localStorage.setItem('lingee-theme', theme)
   }, [theme])
 
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
