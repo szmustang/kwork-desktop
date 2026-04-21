@@ -287,7 +287,7 @@ function App() {
       {/* 顶部导航栏 */}
       <header className="topbar">
         <div className="topbar-left">
-                  <span className="logo-text">Kwork</span>
+                                    <span className="logo-text"></span>
                 </div>
 
         <nav className="topbar-tabs">

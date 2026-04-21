@@ -102,7 +102,7 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
                   <text x="24" y="30" textAnchor="middle" fill="white" fontSize="18" fontWeight="bold">K</text>
                 </svg>
                 <div className="about-logo-text">
-                  <span className="about-product-name">KWork</span>
+                  <span className="about-product-name">Lingee</span>
                 </div>
               </div>
               {appVersion && <div className="about-version">版本号 {appVersion}</div>}
