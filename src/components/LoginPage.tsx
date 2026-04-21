@@ -102,6 +102,15 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     e.preventDefault()
     setError('')
 
+    if (!account.trim()) {
+      setError(t.errAccount)
+      return
+    }
+    if (!password.trim()) {
+      setError(t.errPassword)
+      return
+    }
+
     if (!agreed) {
       setError(t.errAgreement)
       return
