@@ -10,6 +10,7 @@ const { EventEmitter } = require('events');
 let sidecarProcess = null;
 let cachedServerInfo = null;
 const childPids = new Set(); // track all spawned child PIDs for cleanup
+let resolvedShellEnv = null; // cached shell environment (PATH etc.) from login shell
 
 const KCODE_DIR = path.join(process.env.HOME || os.homedir(), '.kcode');
 const SERVER_JSON_PATH = path.join(KCODE_DIR, 'server.json');
@@ -28,6 +29,55 @@ let installState = {
   error: null,
   promise: null,       // current install promise (concurrency lock)
 };
+
+/* ── Shell environment resolution (macOS GUI apps lack full PATH) ── */
+
+/**
+ * Resolve the user's full login-shell environment.
+ * On macOS, GUI apps launched from Finder don't execute .zshrc/.bashrc,
+ * so PATH misses nvm, kd, and other user-installed tools.
+ * This function runs the user's default shell in login-interactive mode
+ * to capture the real environment, then caches it.
+ */
+function resolveShellEnv() {
+  if (resolvedShellEnv) return Promise.resolve(resolvedShellEnv);
+
+  // Only needed on macOS; on Windows/Linux the env is usually fine
+  if (process.platform !== 'darwin') {
+    resolvedShellEnv = { ...process.env };
+    return Promise.resolve(resolvedShellEnv);
+  }
+
+  return new Promise((resolve) => {
+    const userShell = process.env.SHELL || '/bin/zsh';
+    // Use login (-l) + interactive (-i) mode to source all profile files,
+    // then print PATH so we can merge it.
+    const child = spawn(userShell, ['-ilc', 'echo __PATH_START__"$PATH"__PATH_END__'], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: 5000,
+      env: { ...process.env },
+    });
+    let stdout = '';
+    child.stdout.on('data', (d) => { stdout += d.toString(); });
+    child.on('close', () => {
+      const match = stdout.match(/__PATH_START__(.+?)__PATH_END__/);
+      if (match && match[1]) {
+        const shellPath = match[1].trim();
+        console.log('[Sidecar] Resolved shell PATH:', shellPath);
+        resolvedShellEnv = { ...process.env, PATH: shellPath };
+      } else {
+        console.warn('[Sidecar] Could not resolve shell PATH, using process.env');
+        resolvedShellEnv = { ...process.env };
+      }
+      resolve(resolvedShellEnv);
+    });
+    child.on('error', (err) => {
+      console.warn('[Sidecar] Shell env resolution failed:', err.message);
+      resolvedShellEnv = { ...process.env };
+      resolve(resolvedShellEnv);
+    });
+  });
+}
 
 /* ── Paths ── */
 
@@ -721,8 +771,10 @@ async function startSidecar() {
     // Sync auth.json from default location so sidecar can access API keys
     syncAuthFile(dataDir);
 
+    // Resolve full login-shell environment (includes nvm, kd, etc.)
+    const shellEnv = await resolveShellEnv();
     const env = {
-      ...process.env,
+      ...shellEnv,
       // Use app-local data dir so sessions are isolated
       XDG_DATA_HOME: dataDir,
     };
@@ -833,4 +885,5 @@ module.exports = {
   installOpencode,
   getInstallState,
   installEvents,
+  resolveShellEnv,
 };

@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
-const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, checkOpencodeUpToDate, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents } = require('./sidecar.cjs');
+const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, checkOpencodeUpToDate, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents, resolveShellEnv } = require('./sidecar.cjs');
 const { startOAuth2Login } = require('./oauth2.cjs');
 const devServerURL = process.env.VITE_DEV_SERVER_URL;
 
@@ -502,7 +502,11 @@ installEvents.on('progress', (data) => {
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Pre-resolve login-shell environment early (macOS GUI apps lack full PATH)
+  // This ensures nvm, kd, and other shell-profile tools are available to opencode
+  resolveShellEnv().catch(() => {});
+
   // 初始化 bridge config 的 hostVersion
   currentBridgeConfig.hostVersion = app.getVersion();
 
