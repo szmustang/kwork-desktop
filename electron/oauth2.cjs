@@ -5,7 +5,7 @@ const https = require('https');
 const { URL } = require('url');
 const { BrowserWindow, session } = require('electron');
 
-const OAUTH2_BASE_URL = 'https://kworkdev.kingdee.com';
+const OAUTH2_BASE_URL = 'https://devtest.kingdee.com';
 const OAUTH2_TIMEOUT = 5 * 60 * 1000; // 5 分钟超时
 
 // 模块级防重复点击
