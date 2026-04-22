@@ -17,7 +17,7 @@ const SERVER_JSON_PATH = path.join(KCODE_DIR, 'server.json');
 const UPDATES_DIR = path.join(KCODE_DIR, 'updates');
 const UPDATE_PENDING_PATH = path.join(UPDATES_DIR, 'update-pending.json');
 const DOWNLOAD_DIR = path.join(UPDATES_DIR, 'download');
-const CDN_BASE = 'http://tdmrxr8op.hn-bkt.clouddn.com/opencode';
+const CDN_BASE = 'http://prod.cosmicstudio.cn/cosmicai/lingee/update/opencode';
 
 /* ── Install event emitter (main.cjs listens for progress) ── */
 const installEvents = new EventEmitter();
