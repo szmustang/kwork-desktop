@@ -65,6 +65,10 @@ contextBridge.exposeInMainWorld('lingeeBridge', {
   // ── 事件上报（被嵌套端 → 宿主） ──
   notify: (event, data) => ipcRenderer.invoke('lingeeBridge:notify', event, data),
 
+  // ── HTTP 代理（绕过 CORS） ──
+  // Node.js 主进程发起请求，不受浏览器跨域限制
+  proxyFetch: (url, options) => ipcRenderer.invoke('lingeeBridge:proxy-fetch', url, options),
+
   // ── 生命周期 ──
   onStopRequested: (callback) => {
     _stopCallbacks.add(callback);

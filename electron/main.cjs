@@ -241,6 +241,33 @@ ipcMain.handle('lingeeBridge:copy-to-clipboard', (_event, text) => {
   }
 });
 
+// 通用 HTTP 代理：webview 侧通过 lingeeBridge.proxyFetch() 发起跨域请求
+// Node.js 主进程不受 CORS 限制，可直接请求任意外部 API
+ipcMain.handle('lingeeBridge:proxy-fetch', async (_event, url, options) => {
+  if (!url || typeof url !== 'string') return { ok: false, status: 0, error: 'url is required' };
+  // 仅允许 http/https
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return { ok: false, status: 0, error: 'only http/https URLs are allowed' };
+  }
+  try {
+    const method = (options && options.method) || 'GET';
+    const headers = (options && options.headers) || {};
+    const body = options && options.body !== undefined ? options.body : undefined;
+    const resp = await fetch(url, { method, headers, body: body !== undefined ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined });
+    const text = await resp.text();
+    // 提取响应头子集（避免序列化整个 Headers 对象）
+    const respHeaders = {};
+    for (const key of ['content-type', 'x-request-id']) {
+      const v = resp.headers.get(key);
+      if (v) respHeaders[key] = v;
+    }
+    return { ok: resp.ok, status: resp.status, body: text, headers: respHeaders };
+  } catch (err) {
+    console.error('[LingeeBridge] proxy-fetch failed:', err.message);
+    return { ok: false, status: 0, error: err.message };
+  }
+});
+
 // 接收 webview 上报的业务事件
 const KNOWN_BRIDGE_EVENTS = new Set(['ready', 'token-expired', 'navigation', 'error']);
 ipcMain.handle('lingeeBridge:notify', (_event, eventName, data) => {
