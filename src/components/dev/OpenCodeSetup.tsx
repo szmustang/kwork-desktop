@@ -190,8 +190,8 @@ export default function OpenCodeSetup({ state, onRetry }: OpenCodeSetupProps) {
       <div className="dt-setup">
         <div className="dt-setup-card">
           <div className="dt-setup-icon">⬇️</div>
-          <h3>正在下载 Kingdee Code</h3>
-          <p className="dt-setup-desc">首次使用需要下载开发引擎，请稍候...</p>
+          <h3>发现新版 Kingdee Code</h3>
+          <p className="dt-setup-desc">正在下载Kingdee Code，请稍候...</p>
           <div className="dt-progress-bar">
             <div className="dt-progress-fill" style={{ width: `${downloadProgress}%` }} />
           </div>
@@ -219,8 +219,8 @@ export default function OpenCodeSetup({ state, onRetry }: OpenCodeSetupProps) {
       <div className="dt-setup">
         <div className="dt-setup-card">
           <div className="dt-setup-icon">🚀</div>
-          <h3>正在启动服务</h3>
-          <p className="dt-setup-desc">正在启动 Kingdee Code 服务，请稍候...</p>
+          <h3>正在启动引擎</h3>
+          <p className="dt-setup-desc">正在启动 Kingdee Code 引擎，请稍候...</p>
           <div className="dt-setup-spinner" />
         </div>
       </div>
