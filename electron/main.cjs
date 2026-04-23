@@ -421,7 +421,7 @@ app.name = '金蝶灵基';
 // 配置自动更新
 autoUpdater.setFeedURL({
   provider: 'generic',
-  url: 'http://tdmrxr8op.hn-bkt.clouddn.com/updates/'
+  url: 'http://app.cosmicstudio.cn/cosmicai/lingee/update/'
 });
 
 // 开发模式下强制检查更新（仅用于测试）
