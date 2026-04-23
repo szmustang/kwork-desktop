@@ -149,12 +149,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setError('')
     setOauthLoading(true)
     try {
-      const api = (window as any).electronAPI
-      if (!api?.oauth2Login) {
+      const bridge = (window as any).lingeeBridge
+      if (!bridge?.oauth2Login) {
         setOauthError(t.errNetwork)
         return
       }
-      const result = await api.oauth2Login()
+      const result = await bridge.oauth2Login()
       if (!result.success) {
         // 用户主动关闭授权窗口 → 静默恢复，不显示错误
         if (result.errorCode === 'CANCELLED') {

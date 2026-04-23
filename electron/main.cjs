@@ -272,18 +272,21 @@ ipcMain.handle('lingeeBridge:proxy-fetch', async (_event, url, options) => {
 const KNOWN_BRIDGE_EVENTS = new Set(['ready', 'token-expired', 'navigation', 'error']);
 ipcMain.handle('lingeeBridge:notify', (_event, eventName, data) => {
   if (!eventName || typeof eventName !== 'string') return { ok: false };
-  console.log(`[LingeeBridge] notify: ${eventName}`, data || '');
+
+  // token-expired 事件：立即清除主进程缓存的 auth，广播到所有 webview，通知渲染进程登出
+  if (eventName === 'token-expired') {
+    console.warn('[LingeeBridge] token-expired received, clearing auth and triggering logout');
+    currentBridgeConfig = { ...currentBridgeConfig, auth: null };
+    broadcastToWebviews('lingeeBridge:config-changed', currentBridgeConfig);
+  }
 
   // 转发到渲染进程（UI 层可据此响应，如 token-expired → 重新登录）
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('lingeeBridge:webview-event', eventName, data);
   }
 
-  // navigation 事件：可选更新窗口标题
-  if (eventName === 'navigation' && data?.title && mainWindow && !mainWindow.isDestroyed()) {
-    // 仅记录日志，标题栏由自定义 UI 管理
-    console.log(`[LingeeBridge] navigation: ${data.path} - ${data.title}`);
-  }
+  // navigation 事件：预留扩展点，目前仅标记为已知事件
+  // if (eventName === 'navigation') { /* 标题栏由自定义 UI 管理 */ }
 
   return { ok: KNOWN_BRIDGE_EVENTS.has(eventName) };
 });

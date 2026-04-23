@@ -22,15 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleDevTools: () => ipcRenderer.invoke('toggle-devtools'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   openPath: (targetPath) => ipcRenderer.invoke('open-path', targetPath),
-  oauth2Login: () => ipcRenderer.invoke('oauth2-login'),
-  // LingeeBridge: 渲染进程向主进程推送配置变更，主进程存储并广播到所有 webview
-  updateBridgeConfig: (config) => ipcRenderer.invoke('lingeeBridge:update-config', config),
-  // LingeeBridge: 监听 webview 上报的事件（主进程转发）
-  onWebviewEvent: (callback) => {
-    const listener = (_event, eventName, data) => callback(eventName, data);
-    ipcRenderer.on('lingeeBridge:webview-event', listener);
-    return () => ipcRenderer.removeListener('lingeeBridge:webview-event', listener);
-  },
+  // oauth2Login / updateBridgeConfig / onWebviewEvent 已迁移至 lingeeBridge，此处不再暴露
   onInstallProgress: (callback) => {
     ipcRenderer.on('opencode-install-progress', (_event, progress) => callback(progress));
     return () => ipcRenderer.removeAllListeners('opencode-install-progress');
@@ -58,5 +50,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const listener = (_, error) => cb(error);
     ipcRenderer.on('client-update-error', listener);
     return () => ipcRenderer.removeListener('client-update-error', listener);
+  },
+});
+
+// ── lingeeBridge: 主窗口渲染进程的认证/桥接 API ──
+// 登录、token 过期、配置同步等统一使用 lingeeBridge，与 webview 侧保持一致命名
+contextBridge.exposeInMainWorld('lingeeBridge', {
+  platform: process.platform,
+  // OAuth2 云账号登录
+  oauth2Login: () => ipcRenderer.invoke('oauth2-login'),
+  // 渲染进程向主进程推送配置变更（auth/theme/language），主进程存储并广播到所有 webview
+  updateBridgeConfig: (config) => ipcRenderer.invoke('lingeeBridge:update-config', config),
+  // 监听 webview 上报的事件（主进程转发），如 token-expired
+  onWebviewEvent: (callback) => {
+    const listener = (_event, eventName, data) => callback(eventName, data);
+    ipcRenderer.on('lingeeBridge:webview-event', listener);
+    return () => ipcRenderer.removeListener('lingeeBridge:webview-event', listener);
   },
 });

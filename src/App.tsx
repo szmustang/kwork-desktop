@@ -290,11 +290,11 @@ function App() {
   // ── LingeeBridge: 配置同步 ──
   // 当 theme / user / appVersion 变化时，将完整 LingeeConfig 推送到主进程，主进程广播到所有 webview
   useEffect(() => {
-    const api = (window as any).electronAPI
-    if (!api?.updateBridgeConfig) return
+    const bridge = (window as any).lingeeBridge
+    if (!bridge?.updateBridgeConfig) return
     const langRaw = localStorage.getItem('lingee-lang') || 'zh'
     const language = langRaw === 'en' ? 'en-US' : 'zh-CN'
-    api.updateBridgeConfig({
+    bridge.updateBridgeConfig({
       language,
       theme,
       auth: user ? {
@@ -312,9 +312,8 @@ function App() {
 
   // ── LingeeBridge: webview 事件监听 ──
   useEffect(() => {
-    const api = (window as any).electronAPI
-    const removeWebviewEvent = api?.onWebviewEvent?.((eventName: string, data: any) => {
-      console.log('[App] Webview bridge event:', eventName, data)
+    const bridge = (window as any).lingeeBridge
+    const removeWebviewEvent = bridge?.onWebviewEvent?.((eventName: string, _data: any) => {
       if (eventName === 'token-expired') {
         // webview 报告 token 过期 → 清除登录状态，显示登录页
         handleLogout()
