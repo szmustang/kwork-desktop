@@ -317,6 +317,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   </svg>
                 </button>
               )}
+              {/* TODO: 密码可见性切换按钮，暂时隐藏，后续可能恢复
               <button type="button" className="login-eye-btn" onClick={() => setShowPassword(!showPassword)} title={showPassword ? 'Hide' : 'Show'}>
                 {showPassword ? (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -332,6 +333,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   </svg>
                 )}
               </button>
+              */}
               <span className="login-forgot-link" onClick={() => {}}>{t.forgotPassword}</span>
             </div>
           </div>

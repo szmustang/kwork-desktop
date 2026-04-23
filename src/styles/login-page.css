@@ -97,6 +97,8 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
   padding: 6px 0;
   animation: login-lang-fade-in 0.15s ease-out;
+  z-index: 100;
+  -webkit-app-region: no-drag;
 }
 
 @keyframes login-lang-fade-in {
