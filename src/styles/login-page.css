@@ -128,8 +128,7 @@
 .login-branding {
   position: absolute;
   left: 8%;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 33%;
   z-index: 2;
   -webkit-app-region: no-drag;
 }
@@ -138,35 +137,42 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 4px;
 }
 
 .login-brand-text {
-  font-size: 56px;
-  font-weight: 700;
-  color: #1f2328;
-  letter-spacing: -1px;
-  line-height: 1;
+  color: var(--94-black-212121, var(--neutral-900, rgba(0, 0, 0, 0.94)));
+  font-size: 69.898px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 107.031px;
 }
 
 .login-brand-badge {
   display: inline-flex;
+  justify-content: center;
   align-items: center;
-  padding: 4px 14px;
-  font-size: 16px;
+  padding: 1px 12px;
+  border-radius: 13.106px;
+  border: 1.092px solid #FFF;
+  background: linear-gradient(105deg, rgba(81, 162, 255, 0.40) 0%, rgba(0, 122, 255, 0.70) 100%);
+  color: #FFF;
+  /* font-family: "Microsoft YaHei", sans-serif; */
+  font-size: 30.58px;
+  font-style: normal;
   font-weight: 600;
-  color: #5b7bd5;
-  background: rgba(91, 123, 213, 0.1);
-  border: 1px solid rgba(91, 123, 213, 0.2);
-  border-radius: 6px;
-  letter-spacing: 0.5px;
+  line-height: 48.055px;
 }
 
 .login-brand-slogan {
-  font-size: 18px;
-  color: #555;
+  color: var(--94-black-212121, var(--neutral-900, rgba(0, 0, 0, 0.94)));
+  /* font-family: "PingFang SC", sans-serif; */
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 300;
+  line-height: 36px;
+  letter-spacing: 2.4px;
   margin: 0;
-  letter-spacing: 1px;
 }
 
 /* 登录卡片 */
@@ -449,4 +455,47 @@
   width: 13.75px;
   height: 20px;
   flex-shrink: 0;
+}
+
+/* 敬请期待提示 Toast */
+.login-coming-soon-toast {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: inline-flex;
+  height: 40px;
+  padding: 0 12px;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  border-radius: 16px;
+  border: 1px solid var(--primary-200, #BCD8FF);
+  background: var(--primary-50, #EEF5FF);
+  box-shadow: 0 6px 12px 0 rgba(0, 0, 0, 0.04);
+  animation: login-coming-soon-fade-in 0.25s ease-out;
+  -webkit-app-region: no-drag;
+}
+
+.login-coming-soon-toast svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.login-coming-soon-text {
+  color: #2F2F2F;
+  text-align: center;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+@keyframes login-coming-soon-fade-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
