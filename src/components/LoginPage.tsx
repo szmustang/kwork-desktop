@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useState, useRef, useEffect, type FormEvent } from 'react'
 import { login, AuthError } from '../services/auth-api'
-import loginBg from '../assets/loginbg.png'
+import loginVideo from '../assets/loginvideo.mp4'
 import '../styles/login-page.css'
 
 export interface UserInfo {
@@ -22,7 +22,7 @@ type Lang = 'zh' | 'en'
 
 const i18n: Record<Lang, Record<string, string>> = {
   zh: {
-    title: '登录使用完整功能',
+    title: '欢迎使用Lingee',
     accountPlaceholder: '请输入账号',
     passwordPlaceholder: '请输入密码',
     forgotPassword: '忘记密码?',
@@ -35,6 +35,7 @@ const i18n: Record<Lang, Record<string, string>> = {
     moreMethods: '更多登录方式',
     kdcloudLogin: '金蝶云账号登录',
     kdcloudLoggingIn: '金蝶云登录中...',
+    langLabel: '简体中文',
     errAccount: '请输入账号',
     errPassword: '请输入密码',
     errAgreement: '请先阅读并同意用户协议',
@@ -49,7 +50,7 @@ const i18n: Record<Lang, Record<string, string>> = {
     clear: '清除',
   },
   en: {
-    title: 'Sign in to use full features',
+    title: 'Welcome to Lingee',
     accountPlaceholder: 'Enter your account',
     passwordPlaceholder: 'Enter your password',
     forgotPassword: 'Forgot?',
@@ -62,6 +63,7 @@ const i18n: Record<Lang, Record<string, string>> = {
     moreMethods: 'More sign-in methods',
     kdcloudLogin: 'Kingdee Cloud Account',
     kdcloudLoggingIn: 'Signing in via Kingdee Cloud...',
+    langLabel: 'English',
     errAccount: 'Please enter your account',
     errPassword: 'Please enter your password',
     errAgreement: 'Please read and agree to the User Agreement',
@@ -91,6 +93,20 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState(false)
   const [oauthError, setOauthError] = useState('')
+  const [langOpen, setLangOpen] = useState(false)
+  const langRef = useRef<HTMLDivElement>(null)
+
+  // 点击外部关闭语言下拉
+  useEffect(() => {
+    if (!langOpen) return
+    const handleClick = (e: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) {
+        setLangOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [langOpen])
 
   const switchLang = (newLang: Lang) => {
     setLang(newLang)
@@ -198,35 +214,68 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   return (
-    <div className="login-page" style={{ backgroundImage: `url(${loginBg})` }}>
+    <div className="login-page">
+      {/* 视频背景 */}
+      <video
+        className="login-video-bg"
+        src={loginVideo}
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
+      <div className="login-video-overlay" />
+
       {/* 语言切换 */}
-      <div className="login-lang-switcher">
-        <button
-          className={`login-lang-btn ${lang === 'zh' ? 'active' : ''}`}
-          onClick={() => switchLang('zh')}
-        >
-          中文
-        </button>
-        <span className="login-lang-sep">/</span>
-        <button
-          className={`login-lang-btn ${lang === 'en' ? 'active' : ''}`}
-          onClick={() => switchLang('en')}
-        >
-          EN
-        </button>
+      <div className="login-lang-switcher" ref={langRef}>
+        <div className="login-lang-trigger" onClick={() => setLangOpen(!langOpen)}>
+          <svg className="login-lang-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10A15.3 15.3 0 0112 2z" />
+          </svg>
+          <span className="login-lang-label">{t.langLabel}</span>
+          <svg className={`login-lang-arrow ${langOpen ? 'open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </div>
+        {langOpen && (
+          <div className="login-lang-dropdown">
+            <div
+              className={`login-lang-option ${lang === 'zh' ? 'active' : ''}`}
+              onClick={() => { switchLang('zh'); setLangOpen(false) }}
+            >
+              <span>简体中文</span>
+              {lang === 'zh' && (
+                <svg className="login-lang-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1677ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+            </div>
+            <div
+              className={`login-lang-option ${lang === 'en' ? 'active' : ''}`}
+              onClick={() => { switchLang('en'); setLangOpen(false) }}
+            >
+              <span>English</span>
+              {lang === 'en' && (
+                <svg className="login-lang-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1677ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 左侧品牌区 */}
+      <div className="login-branding">
+        <div className="login-brand-name">
+          <span className="login-brand-text">Lingee</span>
+          <span className="login-brand-badge">Beta</span>
+        </div>
+        <p className="login-brand-slogan">智能企业，AI 办公，首选 Lingee</p>
       </div>
 
       <div className="login-card">
-        <button
-          className="login-close-btn"
-          title={t.close}
-          onClick={() => (window as any).lingeeBridge?.relaunchApp?.() || window.close()}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M1 1l12 12M13 1L1 13" />
-          </svg>
-        </button>
-
         <h2 className="login-title">{t.title}</h2>
 
         <form className="login-form" onSubmit={handleSubmit}>
@@ -274,7 +323,16 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   </svg>
                 )}
               </button>
+              <span className="login-forgot-link" onClick={() => {}}>{t.forgotPassword}</span>
             </div>
+          </div>
+
+          {/* 注册链接 */}
+          <div className="login-register-row">
+            <span>{t.noAccount}</span>
+            <a className="login-register-link" href="#register" onClick={(e) => e.preventDefault()}>
+              {t.register}
+            </a>
           </div>
 
           {/* 错误提示（固定占位） */}
@@ -286,7 +344,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </div>
 
           {/* 登录按钮 */}
-          <button className="login-submit-btn" type="submit" disabled={loading || oauthLoading} style={{ marginTop: 8 }}>
+          <button className="login-submit-btn" type="submit" disabled={loading || oauthLoading}>
             {loading ? t.loggingIn : t.login}
           </button>
 
