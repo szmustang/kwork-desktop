@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
+import { LINGEE_BASE_URL } from '../constants'
 
-const WORK_URL = 'https://devtest.kingdee.com/session/new'
+const WORK_URL = `${LINGEE_BASE_URL}/session/new`
 
 export default function WorkTab() {
   const webviewRef = useRef<HTMLWebViewElement>(null)

@@ -1,5 +1,7 @@
 // ===== 登录认证 API =====
 
+import { LINGEE_BASE_URL } from '../constants'
+
 /** 登录请求参数 */
 export interface LoginRequest {
   username: string
@@ -41,7 +43,7 @@ export class AuthError extends Error {
 }
 
 /** 认证 API 基础 URL */
-const AUTH_BASE_URL = 'https://devtest.kingdee.com'
+const AUTH_BASE_URL = LINGEE_BASE_URL
 
 /**
  * 调用 POST /auth/login 进行登录

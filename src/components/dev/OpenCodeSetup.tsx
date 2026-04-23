@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { t, type Lang, type MessageKey } from '../../i18n'
 
 /* ── Types for LingeeBridge IPC ── */
 
@@ -113,7 +114,7 @@ export function useOpenCodeSetup(): OpenCodeSetupResult {
 
         if (!installResult.success) {
           console.log('[OpenCodeSetup] Install failed:', installResult.error)
-          setState(prev => ({ ...prev, status: 'error', error: installResult.error || '安装失败' }))
+          setState(prev => ({ ...prev, status: 'error', error: installResult.error || 'setupInstallFailed' }))
           return
         }
         // Install succeeded, now start sidecar
@@ -131,7 +132,7 @@ export function useOpenCodeSetup(): OpenCodeSetupResult {
         setState(prev => ({ ...prev, status: 'ready', serverUrl: url }))
       } else {
         console.log('[OpenCodeSetup] → status: error', result.error)
-        setState(prev => ({ ...prev, status: 'error', error: result.error || '启动 Kingdee Code 服务失败' }))
+        setState(prev => ({ ...prev, status: 'error', error: result.error || 'setupStartFailed' }))
       }
     } catch (err) {
       console.error('[OpenCodeSetup] Check failed:', err)
@@ -154,7 +155,7 @@ export function useOpenCodeSetup(): OpenCodeSetupResult {
       } else if (data.status === 'installing') {
         setState(prev => ({ ...prev, status: 'installing' }))
       } else if (data.status === 'error') {
-        setState(prev => ({ ...prev, status: 'error', error: data.error || '安装失败' }))
+        setState(prev => ({ ...prev, status: 'error', error: data.error || 'setupInstallFailed' }))
         runningRef.current = false
       }
       // 'done' is handled by the check() flow continuing after installOpencode resolves
@@ -175,10 +176,16 @@ export function useOpenCodeSetup(): OpenCodeSetupResult {
 interface OpenCodeSetupProps {
   state: SetupState
   onRetry: () => void
+  lang: Lang
 }
 
-export default function OpenCodeSetup({ state, onRetry }: OpenCodeSetupProps) {
+// hook 存储的 error 可能是 i18n key（回退值）或 API 返回的原始错误字符串
+const I18N_ERROR_KEYS = new Set<string>(['setupInstallFailed', 'setupStartFailed'])
+
+export default function OpenCodeSetup({ state, onRetry, lang }: OpenCodeSetupProps) {
   const { status, error, downloadProgress } = state
+  // 如果 error 是已知的 i18n key，则翻译显示；否则直接展示 API 错误信息
+  const displayError = error && I18N_ERROR_KEYS.has(error) ? t(lang, error as MessageKey) : error
 
   // checking / found → 静默等待，不显示 UI
   if (status === 'checking' || status === 'found') {
@@ -190,8 +197,8 @@ export default function OpenCodeSetup({ state, onRetry }: OpenCodeSetupProps) {
       <div className="dt-setup">
         <div className="dt-setup-card">
           <div className="dt-setup-icon">⬇️</div>
-          <h3>发现新版 Kingdee Code</h3>
-          <p className="dt-setup-desc">正在下载Kingdee Code，请稍候...</p>
+          <h3>{t(lang, 'setupNewVersion')}</h3>
+          <p className="dt-setup-desc">{t(lang, 'setupDownloading')}</p>
           <div className="dt-progress-bar">
             <div className="dt-progress-fill" style={{ width: `${downloadProgress}%` }} />
           </div>
@@ -206,8 +213,8 @@ export default function OpenCodeSetup({ state, onRetry }: OpenCodeSetupProps) {
       <div className="dt-setup">
         <div className="dt-setup-card">
           <div className="dt-setup-icon">📦</div>
-          <h3>正在安装</h3>
-          <p className="dt-setup-desc">正在解压并安装 Kingdee Code 引擎...</p>
+          <h3>{t(lang, 'setupInstalling')}</h3>
+          <p className="dt-setup-desc">{t(lang, 'setupInstallingDesc')}</p>
           <div className="dt-setup-spinner" />
         </div>
       </div>
@@ -219,8 +226,8 @@ export default function OpenCodeSetup({ state, onRetry }: OpenCodeSetupProps) {
       <div className="dt-setup">
         <div className="dt-setup-card">
           <div className="dt-setup-icon">🚀</div>
-          <h3>正在启动引擎</h3>
-          <p className="dt-setup-desc">正在启动 Kingdee Code 引擎，请稍候...</p>
+          <h3>{t(lang, 'setupStarting')}</h3>
+          <p className="dt-setup-desc">{t(lang, 'setupStartingDesc')}</p>
           <div className="dt-setup-spinner" />
         </div>
       </div>
@@ -232,13 +239,13 @@ export default function OpenCodeSetup({ state, onRetry }: OpenCodeSetupProps) {
       <div className="dt-setup">
         <div className="dt-setup-card">
           <div className="dt-setup-icon">📦</div>
-          <h3>Kingdee Code 未安装</h3>
+          <h3>{t(lang, 'setupNotInstalled')}</h3>
           <p className="dt-setup-desc">
-            开发页签需要 Kingdee Code 引擎支持。<br />
-            请检查网络连接后重试。
+            {t(lang, 'setupNotInstalledDesc')}<br />
+            {t(lang, 'setupNotInstalledHint')}
           </p>
           <button className="dt-setup-btn primary" onClick={onRetry}>
-            🔄 重试下载
+            🔄 {t(lang, 'setupRetryDownload')}
           </button>
         </div>
       </div>
@@ -250,10 +257,10 @@ export default function OpenCodeSetup({ state, onRetry }: OpenCodeSetupProps) {
       <div className="dt-setup">
         <div className="dt-setup-card">
           <div className="dt-setup-icon">❌</div>
-          <h3>出错了</h3>
-          <p className="dt-setup-desc dt-setup-error">{error}</p>
+          <h3>{t(lang, 'setupError')}</h3>
+          <p className="dt-setup-desc dt-setup-error">{displayError}</p>
           <button className="dt-setup-btn primary" onClick={onRetry}>
-            🔄 重试
+            🔄 {t(lang, 'setupRetry')}
           </button>
         </div>
       </div>

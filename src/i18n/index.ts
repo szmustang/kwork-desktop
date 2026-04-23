@@ -1,0 +1,100 @@
+export type Lang = 'zh' | 'en'
+
+const messages = {
+  zh: {
+    // tabs
+    tabChat: '对话',
+    tabWork: '工作',
+    tabDev: '开发',
+    // error boundary
+    errorTitle: '页面出错了',
+    errorRetry: '重试',
+    // update toast
+    updateNewVersion: '发现新版本',
+    updateBuild: 'Build',
+    updateClient: '客户端',
+    updateDownloadFailed: '下载失败，请点击重试',
+    updateDownloaded: '下载完成，点击「重启安装」应用更新',
+    updateAvailable: '有新版本可用，是否立即更新？',
+    updateNow: '立即更新',
+    updateRestart: '重启安装',
+    updateLater: '稍后再说',
+    // user dropdown
+    fileTitle: '文件',
+    notifyTitle: '通知',
+    langSelect: '语言选择',
+    langZh: '简体中文',
+    langEn: 'English',
+    logout: '退出登录',
+    // about dialog
+    aboutWebsite: '官网',
+    aboutTerms: '用户协议',
+    aboutPrivacy: '隐私政策',
+    // opencode setup
+    setupNewVersion: '发现新版 Kingdee Code',
+    setupDownloading: '正在下载 Kingdee Code，请稍候...',
+    setupInstalling: '正在安装',
+    setupInstallingDesc: '正在解压并安装 Kingdee Code 引擎...',
+    setupStarting: '正在启动引擎',
+    setupStartingDesc: '正在启动 Kingdee Code 引擎，请稍候...',
+    setupNotInstalled: 'Kingdee Code 未安装',
+    setupNotInstalledDesc: '开发页签需要 Kingdee Code 引擎支持。',
+    setupNotInstalledHint: '请检查网络连接后重试。',
+    setupRetryDownload: '重试下载',
+    setupError: '出错了',
+    setupRetry: '重试',
+    setupStartFailed: '启动 Kingdee Code 服务失败',
+    setupInstallFailed: '安装失败',
+  },
+  en: {
+    // tabs
+    tabChat: 'Chat',
+    tabWork: 'Work',
+    tabDev: 'Dev',
+    // error boundary
+    errorTitle: 'Something went wrong',
+    errorRetry: 'Retry',
+    // update toast
+    updateNewVersion: 'New version available',
+    updateBuild: 'Build',
+    updateClient: 'Client',
+    updateDownloadFailed: 'Download failed, click to retry',
+    updateDownloaded: 'Download complete, click "Restart to Install" to apply update',
+    updateAvailable: 'A new version is available. Update now?',
+    updateNow: 'Update Now',
+    updateRestart: 'Restart to Install',
+    updateLater: 'Later',
+    // user dropdown
+    fileTitle: 'Files',
+    notifyTitle: 'Notifications',
+    langSelect: 'Language',
+    langZh: '简体中文',
+    langEn: 'English',
+    logout: 'Log Out',
+    // about dialog
+    aboutWebsite: 'Website',
+    aboutTerms: 'Terms of Service',
+    aboutPrivacy: 'Privacy Policy',
+    // opencode setup
+    setupNewVersion: 'New version of Kingdee Code found',
+    setupDownloading: 'Downloading Kingdee Code, please wait...',
+    setupInstalling: 'Installing',
+    setupInstallingDesc: 'Extracting and installing Kingdee Code engine...',
+    setupStarting: 'Starting Engine',
+    setupStartingDesc: 'Starting Kingdee Code engine, please wait...',
+    setupNotInstalled: 'Kingdee Code Not Installed',
+    setupNotInstalledDesc: 'Dev tab requires Kingdee Code engine.',
+    setupNotInstalledHint: 'Please check your network and retry.',
+    setupRetryDownload: 'Retry Download',
+    setupError: 'Error',
+    setupRetry: 'Retry',
+    setupStartFailed: 'Failed to start Kingdee Code service',
+    setupInstallFailed: 'Installation failed',
+  },
+} as const
+
+export type MessageKey = keyof typeof messages.zh
+
+export function t(lang: Lang, key: MessageKey): string {
+  return messages[lang]?.[key] ?? messages.zh[key]
+}

@@ -5,10 +5,12 @@ import ChatTab from './components/ChatTab'
 import WorkTab from './components/WorkTab'
 import DevTab from './components/DevTab'
 import { useOpenCodeSetup } from './components/dev/OpenCodeSetup'
+import { fetchUserProfile } from './services/user-api'
+import { t, type Lang } from './i18n'
 import './App.css'
 
 // 错误边界：防止子组件崩溃导致整个页面白屏
-class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+class ErrorBoundary extends Component<{ children: ReactNode; lang: Lang }, { error: Error | null }> {
   state = { error: null as Error | null }
   static getDerivedStateFromError(error: Error) { return { error } }
   componentDidCatch(error: Error, info: ErrorInfo) { console.error('[ErrorBoundary]', error, info) }
@@ -16,9 +18,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
     if (this.state.error) {
       return (
         <div style={{ padding: 40, color: '#e5534b', textAlign: 'center' }}>
-          <h3>页面出错了</h3>
+          <h3>{t(this.props.lang, 'errorTitle')}</h3>
           <p style={{ color: '#8b949e', margin: '8px 0 16px' }}>{this.state.error.message}</p>
-          <button onClick={() => this.setState({ error: null })} style={{ padding: '8px 16px', cursor: 'pointer' }}>重试</button>
+          <button onClick={() => this.setState({ error: null })} style={{ padding: '8px 16px', cursor: 'pointer' }}>{t(this.props.lang, 'errorRetry')}</button>
         </div>
       )
     }
@@ -28,11 +30,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 type TabKey = 'chat' | 'work' | 'dev'
 
-const tabs: { key: TabKey; label: string }[] = [
-  { key: 'chat', label: '对话' },
-  { key: 'work', label: '工作' },
-  { key: 'dev', label: '开发' },
-]
+const tabKeys: TabKey[] = ['chat', 'work', 'dev']
 
 /* ── 右下角更新提示弹窗 ── */
 
@@ -41,7 +39,7 @@ const CLIENT_CHECK_INTERVAL = 60 * 60 * 1000      // 客户端: 1 小时
 const OPENCODE_CHECK_DELAY = 5 * 60 * 1000        // opencode 首次检测延迟: 5 分钟
 const CLIENT_CHECK_DELAY = 1 * 60 * 1000          // 客户端首次检测延迟: 1 分钟（测试用）
 
-function UpdateToast() {
+function UpdateToast({ lang }: { lang: Lang }) {
   const [updateInfo, setUpdateInfo] = useState<{ version: string; type: 'opencode' | 'client' } | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
@@ -135,7 +133,7 @@ function UpdateToast() {
     const opencodeTimer = setTimeout(checkOpencodeUpdate, OPENCODE_CHECK_DELAY)
     const opencodeInterval = setInterval(checkOpencodeUpdate, OPENCODE_CHECK_INTERVAL)
     
-    // 客户端: 35 分钟后首次检查，之后每 1 小时（与 opencode 错开 30 分钟）
+    // 客户端: 1 分钟后首次检查，之后每 1 小时
     const clientTimer = setTimeout(checkClientUpdate, CLIENT_CHECK_DELAY)
     const clientInterval = setInterval(checkClientUpdate, CLIENT_CHECK_INTERVAL)
     
@@ -203,7 +201,7 @@ function UpdateToast() {
       <div className="update-toast-content">
         <div className="update-toast-icon">⬆️</div>
         <div className="update-toast-text">
-          <strong>发现新版本 {isOpencode ? 'Build' : '客户端'} {updateInfo.version}</strong>
+          <strong>{t(lang, 'updateNewVersion')} {isOpencode ? t(lang, 'updateBuild') : t(lang, 'updateClient')} {updateInfo.version}</strong>
           {downloading ? (
             <div className="update-toast-progress">
               <div className="update-toast-progress-bar">
@@ -212,20 +210,20 @@ function UpdateToast() {
               <span className="update-toast-percent">{downloadProgress}%</span>
             </div>
           ) : downloadError ? (
-            <p style={{ color: '#e5534b' }}>下载失败，请点击重试</p>
+            <p style={{ color: '#e5534b' }}>{t(lang, 'updateDownloadFailed')}</p>
           ) : isClientDownloaded ? (
-            <p>下载完成，点击「重启安装」应用更新</p>
+            <p>{t(lang, 'updateDownloaded')}</p>
           ) : (
-            <p>{isOpencode ? 'Kingdee Code' : 'Kingdee Lingee'} 有新版本可用，是否立即更新？</p>
+            <p>{isOpencode ? 'Kingdee Code' : 'Kingdee Lingee'} {t(lang, 'updateAvailable')}</p>
           )}
         </div>
       </div>
       {!downloading && (
         <div className="update-toast-actions">
           <button className="update-toast-btn primary" onClick={handleUpdate}>
-            {isClientDownloaded ? '重启安装' : '立即更新'}
+            {isClientDownloaded ? t(lang, 'updateRestart') : t(lang, 'updateNow')}
           </button>
-          <button className="update-toast-btn" onClick={handleDismiss}>稍后再说</button>
+          <button className="update-toast-btn" onClick={handleDismiss}>{t(lang, 'updateLater')}</button>
         </div>
       )}
     </div>
@@ -239,6 +237,9 @@ function App() {
   const openCodeSetup = useOpenCodeSetup()
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('lingee-theme') as 'dark' | 'light') || 'light'
+  })
+  const [lang, setLang] = useState<Lang>(() => {
+    return (localStorage.getItem('lingee-lang') as Lang) || 'zh'
   })
   const [appVersion, setAppVersion] = useState('')
   const [appName, setAppName] = useState('')
@@ -272,10 +273,38 @@ function App() {
     } catch { return null }
   })
 
+  // 登录成功后，拉取用户真实信息（头像、显示名、角色等）
+  const fetchAndMergeProfile = useCallback(async (userInfo: UserInfo) => {
+    try {
+      const profile = await fetchUserProfile(userInfo.userId, userInfo.token)
+      console.log('[App] fetchUserProfile result:', profile)
+      const merged: UserInfo = {
+        ...userInfo,
+        displayName: profile.displayName || profile.truename || userInfo.displayName,
+        role: profile.role || userInfo.role,
+        avatar: profile.avatar ?? userInfo.avatar,
+        // 完整的用户档案字段
+        truename: profile.truename ?? userInfo.truename,
+        nickname: profile.nickname ?? userInfo.nickname,
+        email: profile.email ?? userInfo.email,
+        phone: profile.phone ?? userInfo.phone,
+        gender: profile.gender ?? userInfo.gender,
+      }
+      localStorage.setItem('lingee-user', JSON.stringify(merged))
+      setUser(merged)
+    } catch (err) {
+      console.warn('[App] fetchUserProfile failed, using login data:', err)
+      localStorage.setItem('lingee-user', JSON.stringify(userInfo))
+      setUser(userInfo)
+    }
+  }, [])
+
   const handleLogin = useCallback((userInfo: UserInfo) => {
     localStorage.setItem('lingee-user', JSON.stringify(userInfo))
     setUser(userInfo)
-  }, [])
+    // 异步拉取完整用户信息并更新
+    fetchAndMergeProfile(userInfo)
+  }, [fetchAndMergeProfile])
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem('lingee-user')
@@ -287,13 +316,30 @@ function App() {
     localStorage.setItem('lingee-theme', theme)
   }, [theme])
 
+  // ── 语言持久化 & 登录同步 ──
+  useEffect(() => {
+    localStorage.setItem('lingee-lang', lang)
+  }, [lang])
+
+  // 登录成功后，从 localStorage 同步 LoginPage 可能修改的语言偏好
+  useEffect(() => {
+    if (user) {
+      const stored = (localStorage.getItem('lingee-lang') as Lang) || 'zh'
+      setLang(stored)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
+
+  const handleLangChange = useCallback((newLang: Lang) => {
+    setLang(newLang)
+  }, [])
+
   // ── LingeeBridge: 配置同步 ──
-  // 当 theme / user / appVersion 变化时，将完整 LingeeConfig 推送到主进程，主进程广播到所有 webview
+  // 当 theme / user / appVersion / lang 变化时，将完整 LingeeConfig 推送到主进程，主进程广播到所有 webview
   useEffect(() => {
     const bridge = (window as any).lingeeBridge
     if (!bridge?.updateBridgeConfig) return
-    const langRaw = localStorage.getItem('lingee-lang') || 'zh'
-    const language = langRaw === 'en' ? 'en-US' : 'zh-CN'
+    const language = lang === 'en' ? 'en-US' : 'zh-CN'
     bridge.updateBridgeConfig({
       language,
       theme,
@@ -308,7 +354,7 @@ function App() {
       } : null,
       hostVersion: appVersion || 'unknown',
     })
-  }, [theme, user, appVersion])
+  }, [theme, user, appVersion, lang])
 
   // ── LingeeBridge: webview 事件监听 ──
   useEffect(() => {
@@ -322,7 +368,17 @@ function App() {
     return () => removeWebviewEvent?.()
   }, [handleLogout])
 
-  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
+  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark')
+
+  // 登录后刷新/恢复时，如果缓存中没有 avatar 且未拉取过 profile，则拉一次用户信息
+  const profileFetchedRef = useRef(false)
+  useEffect(() => {
+    if (user && !user.avatar && user.userId && user.token && !profileFetchedRef.current) {
+      profileFetchedRef.current = true
+      fetchAndMergeProfile(user)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // 仅首次挂载时执行
 
   // 未登录 → 显示登录页
   if (!user) {
@@ -339,25 +395,25 @@ function App() {
                 </div>
 
         <nav className="topbar-tabs">
-          {tabs.map((tab) => (
+          {tabKeys.map((key) => (
             <button
-              key={tab.key}
-              className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
+              key={key}
+              className={`tab-btn ${activeTab === key ? 'active' : ''}`}
+              onClick={() => setActiveTab(key)}
             >
-              {tab.label}
+              {t(lang, key === 'chat' ? 'tabChat' : key === 'work' ? 'tabWork' : 'tabDev')}
             </button>
           ))}
         </nav>
 
         <div className="topbar-right">
-          <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} appVersion={appVersion} appName={appName} externalShowAbout={triggerAbout} onAboutClosed={() => setTriggerAbout(false)} />
+          <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} appVersion={appVersion} appName={appName} externalShowAbout={triggerAbout} onAboutClosed={() => setTriggerAbout(false)} lang={lang} onLangChange={handleLangChange} />
         </div>
       </header>
 
       {/* 主内容区 — 所有页签始终挂载，用 display 切换，避免 webview 重载 */}
       <main className="main-content">
-        <ErrorBoundary>
+        <ErrorBoundary lang={lang}>
           <div style={{ display: activeTab === 'chat' ? 'contents' : 'none' }}>
             <ChatTab />
           </div>
@@ -365,13 +421,13 @@ function App() {
             <WorkTab />
           </div>
           <div style={{ display: activeTab === 'dev' ? 'contents' : 'none' }}>
-            <DevTab setup={openCodeSetup} />
+            <DevTab setup={openCodeSetup} lang={lang} />
           </div>
         </ErrorBoundary>
       </main>
 
       {/* 右下角更新提示 */}
-      <UpdateToast />
+      <UpdateToast lang={lang} />
     </div>
   )
 }

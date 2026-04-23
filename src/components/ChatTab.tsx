@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
+import { LINGEE_BASE_URL } from '../constants'
 
-const CHAT_URL = 'https://devtest.kingdee.com/chatbot/new'
+const CHAT_URL = `${LINGEE_BASE_URL}/chatbot/new`
 
 export default function ChatTab() {
   const webviewRef = useRef<HTMLWebViewElement>(null)

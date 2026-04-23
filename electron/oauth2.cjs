@@ -4,8 +4,9 @@
 const https = require('https');
 const { URL } = require('url');
 const { BrowserWindow, session } = require('electron');
+const { LINGEE_BASE_URL } = require('./constants.cjs');
 
-const OAUTH2_BASE_URL = 'https://devtest.kingdee.com';
+const OAUTH2_BASE_URL = LINGEE_BASE_URL;
 const OAUTH2_TIMEOUT = 5 * 60 * 1000; // 5 分钟超时
 
 // 模块级防重复点击
@@ -134,13 +135,18 @@ async function _doOAuth2Login() {
   const partition = `oauth2-${Date.now()}`;
   const oauthSession = session.fromPartition(partition, { cache: false });
 
+  // 登录流程结束后清理 session 存储，避免多次登录产生孤立分区内存泄漏
+  const clearSession = () => {
+    try { oauthSession.clearStorageData(); } catch (_) {}
+  };
+
   // ========== Step 4: 注册 onBeforeRequest 拦截回调 ==========
   const callbackResult = await new Promise((resolve, reject) => {
     let handled = false;
     let authWindow = null;
     let timer = null;
 
-    // 清理函数：确保窗口、定时器、拦截器都被释放
+    // 清理函数：确保窗口、定时器、拦截器、session 都被释放
     const cleanup = () => {
       if (timer) {
         clearTimeout(timer);
@@ -153,6 +159,8 @@ async function _doOAuth2Login() {
         authWindow.close();
         authWindow = null;
       }
+      // 清理 session 存储
+      clearSession();
     };
 
     // 超时处理
@@ -255,6 +263,7 @@ async function _doOAuth2Login() {
         handled = true;
         if (timer) { clearTimeout(timer); timer = null; }
         try { oauthSession.webRequest.onBeforeRequest(null); } catch (_) {}
+        clearSession(); // 用户关闭窗口也需要清理 session 分区
         reject(createError('用户取消了登录', 'CANCELLED'));
       }
     });
@@ -275,7 +284,7 @@ async function _doOAuth2Login() {
     // 优先使用后端返回的 error_message
     let backendMsg = err.body?.error_message;
     if (!backendMsg) {
-      // 兆底：从错误信息中解析 JSON body
+      // 兜底：从错误信息中解析 JSON body
       const match = err.message && err.message.match(/\{[\s\S]*\}/);
       if (match) {
         try { backendMsg = JSON.parse(match[0]).error_message; } catch (_) {}

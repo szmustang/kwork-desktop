@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import OpenCodeSetup, { type OpenCodeSetupResult } from './dev/OpenCodeSetup'
+import type { Lang } from '../i18n'
 import '../styles/dev-tab.css'
 
 /* ====== OpenCode Webview ====== */
@@ -89,7 +90,7 @@ function OpenCodeWebview({ serverUrl }: { serverUrl: string }) {
   )
 }
 
-export default function DevTab({ setup }: { setup: OpenCodeSetupResult }) {
+export default function DevTab({ setup, lang }: { setup: OpenCodeSetupResult; lang: Lang }) {
   const { status, serverUrl } = setup.state
 
   // 未安装 / 出错 / 下载中 / 安装中 / 启动中 → 显示提示
@@ -99,6 +100,7 @@ export default function DevTab({ setup }: { setup: OpenCodeSetupResult }) {
         <OpenCodeSetup
           state={setup.state}
           onRetry={setup.retry}
+          lang={lang}
         />
       </div>
     )

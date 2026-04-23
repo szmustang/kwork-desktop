@@ -12,6 +12,13 @@ export interface UserInfo {
   tenantAccountId: string
   userId: string
   expiresAt: number
+  avatar?: string
+  // 用户档案字段（来自 fetchUserProfile）
+  truename?: string
+  nickname?: string
+  email?: string
+  phone?: string
+  gender?: string
 }
 
 interface LoginPageProps {
@@ -48,6 +55,7 @@ const i18n: Record<Lang, Record<string, string>> = {
     errOAuth2Timeout: '登录超时，请重试',
     close: '关闭',
     clear: '清除',
+    slogan: '智能企业，AI 办公，首选 Lingee',
   },
   en: {
     title: 'Welcome to Lingee',
@@ -76,6 +84,7 @@ const i18n: Record<Lang, Record<string, string>> = {
     errOAuth2Timeout: 'Login timed out, please try again',
     close: 'Close',
     clear: 'Clear',
+    slogan: 'Smart Enterprise, AI Office, Choose Lingee',
   },
 }
 
@@ -272,7 +281,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           <span className="login-brand-text">Lingee</span>
           <span className="login-brand-badge">Beta</span>
         </div>
-        <p className="login-brand-slogan">智能企业，AI 办公，首选 Lingee</p>
+        <p className="login-brand-slogan">{t.slogan}</p>
       </div>
 
       <div className="login-card">

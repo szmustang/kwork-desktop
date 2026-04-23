@@ -32,12 +32,16 @@ contextBridge.exposeInMainWorld('lingeeBridge', {
   installOpencode: () => ipcRenderer.invoke('install-opencode'),
   getInstallState: () => ipcRenderer.invoke('get-install-state'),
   onInstallProgress: (callback) => {
-    ipcRenderer.on('opencode-install-progress', (_event, progress) => callback(progress));
-    return () => ipcRenderer.removeAllListeners('opencode-install-progress');
+    const listener = (_event, progress) => callback(progress);
+    ipcRenderer.on('opencode-install-progress', listener);
+    return () => ipcRenderer.removeListener('opencode-install-progress', listener);
   },
 
   // ── OAuth2 认证 ──
   oauth2Login: () => ipcRenderer.invoke('oauth2-login'),
+
+  // ── 通用 HTTP 代理（绕过渲染进程 CORS 限制，由主进程发起请求） ──
+  proxyFetch: (url, options) => ipcRenderer.invoke('lingeeBridge:proxy-fetch', url, options),
 
   // ── 配置同步（auth/theme/language），主进程存储并广播到所有 webview ──
   updateBridgeConfig: (config) => ipcRenderer.invoke('lingeeBridge:update-config', config),
