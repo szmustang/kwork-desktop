@@ -24,6 +24,54 @@ let currentBridgeConfig = {
   hostVersion: '0.0.0', // app ready 后更新
 };
 
+// ── Bridge Auth 持久化 ──
+// 解决退出应用后重启 webview 白屏问题：主进程内存中的 auth 会丢失，
+// webview preload 通过 sendSync('get-config') 拿到 auth:null → 白屏。
+// 持久化到文件后，启动时即可恢复 auth，确保 webview 首次 get-config 就能拿到有效 token。
+const BRIDGE_AUTH_FILE = path.join(app.getPath('userData'), 'bridge-auth.json');
+
+function persistBridgeAuth(auth) {
+  try {
+    if (auth) {
+      fs.writeFile(BRIDGE_AUTH_FILE, JSON.stringify(auth), 'utf-8', (err) => {
+        if (err) console.warn('[BridgeAuth] persist write failed:', err.message);
+      });
+    } else {
+      // auth 为 null 时删除文件（异步）
+      fs.unlink(BRIDGE_AUTH_FILE, () => {});
+    }
+  } catch (err) {
+    console.warn('[BridgeAuth] persist failed:', err.message);
+  }
+}
+
+function restoreBridgeAuth() {
+  try {
+    if (!fs.existsSync(BRIDGE_AUTH_FILE)) return null;
+    const raw = fs.readFileSync(BRIDGE_AUTH_FILE, 'utf-8');
+    const auth = JSON.parse(raw);
+    // 结构校验：必须包含 token 字段
+    if (!auth || typeof auth !== 'object' || !auth.token) {
+      console.warn('[BridgeAuth] invalid auth structure, discarding');
+      fs.unlink(BRIDGE_AUTH_FILE, () => {});
+      return null;
+    }
+    // token 过期检查：若已过期则不恢复
+    if (auth.expiresAt && Date.now() >= auth.expiresAt) {
+      console.warn('[BridgeAuth] restored token expired, discarding');
+      fs.unlink(BRIDGE_AUTH_FILE, () => {});
+      return null;
+    }
+    return auth;
+  } catch (err) {
+    console.warn('[BridgeAuth] restore failed:', err.message);
+    return null;
+  }
+}
+
+// 启动时立即恢复 auth，确保 webview get-config 能拿到有效 token
+currentBridgeConfig.auth = restoreBridgeAuth();
+
 /** 向所有 webview 广播消息 */
 function broadcastToWebviews(channel, ...args) {
   for (const wc of webContents.getAllWebContents()) {
@@ -215,8 +263,14 @@ ipcMain.handle('lingeeBridge:update-config', (event, config) => {
   // 仅接受主窗口渲染进程的配置推送，拒绝 webview 侧的篡改
   if (mainWindow && event.sender !== mainWindow.webContents) return { ok: false };
   if (!config || typeof config !== 'object') return { ok: false };
+  const prevAuth = currentBridgeConfig.auth;
   // hostVersion 始终由主进程提供，避免渲染进程异步加载期间覆写为 'unknown'
   currentBridgeConfig = { ...config, hostVersion: app.getVersion() };
+  // 仅在 auth 实际变化时才持久化，避免 theme/language 变更触发不必要的磁盘写入
+  const currAuth = currentBridgeConfig.auth;
+  if ((prevAuth?.token ?? null) !== (currAuth?.token ?? null)) {
+    persistBridgeAuth(currAuth);
+  }
   broadcastToWebviews('lingeeBridge:config-changed', currentBridgeConfig);
   return { ok: true };
 });
@@ -277,6 +331,7 @@ ipcMain.handle('lingeeBridge:notify', (_event, eventName, data) => {
   if (eventName === 'token-expired') {
     console.warn('[LingeeBridge] token-expired received, clearing auth and triggering logout');
     currentBridgeConfig = { ...currentBridgeConfig, auth: null };
+    persistBridgeAuth(null); // 同步清除持久化的 auth
     broadcastToWebviews('lingeeBridge:config-changed', currentBridgeConfig);
   }
 
@@ -517,7 +572,7 @@ app.on('web-contents-created', (_, contents) => {
   contents.on('will-attach-webview', (_event, webPreferences, params) => {
     const src = params.src || '';
     // 仅对可信来源注入 preload：localhost / 127.0.0.1 / 内网 IP
-    const trustedPrefixes = ['http://localhost', 'http://127.0.0.1', 'http://172.20.', 'https://devtest.kingdee.com'];
+    const trustedPrefixes = ['http://localhost', 'http://127.0.0.1', 'http://172.20.', 'https://devtest.kingdee.com', 'https://kworkdev.kingdee.com'];
     if (!trustedPrefixes.some(prefix => src.startsWith(prefix))) return;
     webPreferences.preload = path.join(__dirname, 'webview-preload.cjs');
     webPreferences.contextIsolation = true;
