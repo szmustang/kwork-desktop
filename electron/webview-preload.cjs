@@ -75,12 +75,3 @@ contextBridge.exposeInMainWorld('lingeeBridge', {
     return () => _stopCallbacks.delete(callback);
   },
 });
-
-// ── 向后兼容 ──
-// 旧版 webview 代码可能使用 window.electronAPI，保留最小兼容层
-// TODO: 下个大版本移除
-contextBridge.exposeInMainWorld('electronAPI', {
-  platform: process.platform,
-  selectFolder: (options) => ipcRenderer.invoke('select-folder', options),
-  openPath: (targetPath) => ipcRenderer.invoke('open-path', targetPath),
-});

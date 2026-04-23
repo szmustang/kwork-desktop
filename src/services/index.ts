@@ -13,14 +13,14 @@ let apiInstance: OpenCodeAPI | null = null
 export async function getAPI(): Promise<OpenCodeAPI> {
   if (apiInstance) return apiInstance
 
-  // 尝试从 Electron preload 获取 server info
-  const electronAPI = (window as unknown as Record<string, unknown>).electronAPI as
+  // 尝试从 lingeeBridge preload 获取 server info
+  const bridge = (window as unknown as Record<string, unknown>).lingeeBridge as
     | { getServerInfo?: () => Promise<{ url: string } | null> }
     | undefined
 
-  if (electronAPI?.getServerInfo) {
+  if (bridge?.getServerInfo) {
     try {
-      const info = await electronAPI.getServerInfo()
+      const info = await bridge.getServerInfo()
       if (info) {
         const realAPI = createRealAPI(info)
         const healthy = await realAPI.checkHealth()

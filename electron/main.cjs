@@ -511,7 +511,7 @@ autoUpdater.on('update-downloaded', (info) => {
 // 主窗口使用硬编码暗色样式，不受此设置影响
 nativeTheme.themeSource = 'light';
 
-// 为 kcode-web webview 注入 preload，使其内部页面可调用 electronAPI（如 selectFolder）
+// 为 kcode-web webview 注入 preload，使其内部页面可调用 lingeeBridge（如 selectFolder）
 // 仅对 localhost 来源的 webview 注入，避免外部页面获得桥接能力
 app.on('web-contents-created', (_, contents) => {
   contents.on('will-attach-webview', (_event, webPreferences, params) => {

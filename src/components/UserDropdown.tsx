@@ -76,7 +76,7 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
             )}
             <span>{theme === 'dark' ? '浅色模式' : '深色模式'}</span>
           </button>
-          <button className="user-dropdown-action" onClick={() => (window as any).electronAPI?.toggleDevTools()}>
+          <button className="user-dropdown-action" onClick={() => (window as any).lingeeBridge?.toggleDevTools()}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M1.5 1h13l.5.5v13l-.5.5h-13l-.5-.5v-13l.5-.5zM2 5v9h12V5H2zm0-1h12V2H2v2zm3-1H4V2h1v1zm2 0H6V2h1v1z"/>
             </svg>

@@ -51,7 +51,7 @@ function UpdateToast() {
 
   // 检查 opencode 更新
   const checkOpencodeUpdate = useCallback(async () => {
-    const api = (window as any).electronAPI
+    const api = (window as any).lingeeBridge
     if (!api?.checkPendingUpdate) return
 
     try {
@@ -67,7 +67,7 @@ function UpdateToast() {
 
   // 检查客户端更新
   const checkClientUpdate = useCallback(async () => {
-    const api = (window as any).electronAPI
+    const api = (window as any).lingeeBridge
     if (!api?.checkForClientUpdate) return
 
     try {
@@ -80,7 +80,7 @@ function UpdateToast() {
 
   useEffect(() => {
     // 监听客户端更新事件
-    const api = (window as any).electronAPI
+    const api = (window as any).lingeeBridge
     if (!api) return
 
     const removeAvailable = api.onClientUpdateAvailable?.((data: { version: string }) => {
@@ -148,7 +148,7 @@ function UpdateToast() {
   }, [checkOpencodeUpdate, checkClientUpdate])
 
   const handleUpdate = () => {
-    const api = (window as any).electronAPI
+    const api = (window as any).lingeeBridge
     if (!api) return
     
     // 根据更新类型执行不同操作
@@ -245,13 +245,13 @@ function App() {
   const [triggerAbout, setTriggerAbout] = useState(false)
 
   useEffect(() => {
-    const api = (window as any).electronAPI
-    api?.getAppVersion?.().then((v: string) => setAppVersion(v || ''))
-    api?.getAppName?.().then((n: string) => setAppName(n || ''))
-    const cleanupAbout = api?.onShowAbout?.(() => setTriggerAbout(true))
+    const bridge = (window as any).lingeeBridge
+    bridge?.getAppVersion?.().then((v: string) => setAppVersion(v || ''))
+    bridge?.getAppName?.().then((n: string) => setAppName(n || ''))
+    const cleanupAbout = bridge?.onShowAbout?.(() => setTriggerAbout(true))
     // 设置平台 CSS 类，用于区分 macOS/Windows 布局
-    if (api?.platform) {
-      document.documentElement.setAttribute('data-platform', api.platform)
+    if (bridge?.platform) {
+      document.documentElement.setAttribute('data-platform', bridge.platform)
     }
     return () => { cleanupAbout?.() }
   }, [])

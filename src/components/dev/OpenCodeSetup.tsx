@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-/* ── Types for Electron IPC ── */
+/* ── Types for LingeeBridge IPC ── */
 
-interface ElectronOpenCodeAPI {
+interface LingeeBridgeOpenCodeAPI {
   checkOpencode: () => Promise<{ installed: boolean; localVersion?: string | null; remoteVersion?: string | null }>
   getOpencodeVersion: () => Promise<{ version: string | null }>
   startSidecar: () => Promise<{ success: boolean; url?: string; error?: string }>
@@ -17,9 +17,9 @@ interface InstallProgress {
   error?: string
 }
 
-function getElectronAPI(): ElectronOpenCodeAPI | null {
-  const api = (window as unknown as Record<string, unknown>).electronAPI as
-    | ElectronOpenCodeAPI
+function getLingeeBridgeAPI(): LingeeBridgeOpenCodeAPI | null {
+  const api = (window as unknown as Record<string, unknown>).lingeeBridge as
+    | LingeeBridgeOpenCodeAPI
     | undefined
   return api?.checkOpencode ? api : null
 }
@@ -71,9 +71,9 @@ export function useOpenCodeSetup(): OpenCodeSetupResult {
     runningRef.current = true
     console.log('[OpenCodeSetup] check() START', new Date().toISOString())
 
-    const api = getElectronAPI()
+    const api = getLingeeBridgeAPI()
     if (!api) {
-      console.log('[OpenCodeSetup] No electronAPI, using browser fallback')
+      console.log('[OpenCodeSetup] No lingeeBridge, using browser fallback')
       try {
         const resp = await fetch('http://127.0.0.1:4096/session')
         if (resp.ok) {
@@ -144,7 +144,7 @@ export function useOpenCodeSetup(): OpenCodeSetupResult {
 
   // Listen for install progress events from main process
   useEffect(() => {
-    const api = getElectronAPI()
+    const api = getLingeeBridgeAPI()
     if (!api?.onInstallProgress) return
 
     const unsub = api.onInstallProgress((data: InstallProgress) => {
