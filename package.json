@@ -78,6 +78,7 @@
     },
     "nsis": {
       "oneClick": false,
+      "unicode": true,
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
