@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { UserInfo } from './LoginPage'
 import { t, type Lang } from '../i18n'
-import appIcon from '../../build/icon.png'
+import AboutDialog from './AboutDialog'
 import defaultAvatar from '../assets/linggeeuser.jpg'
 
 interface UserDropdownProps {
@@ -135,37 +135,7 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
       )}
 
       {/* 关于弹窗 */}
-      {showAbout && (
-        <>
-          <div className="about-dialog-overlay" onClick={() => setShowAbout(false)} />
-          <div className="about-dialog">
-            <button className="about-dialog-close" onClick={() => setShowAbout(false)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-            <div className="about-dialog-content">
-              <div className="about-logo">
-                <img src={appIcon} alt="Lingee" className="about-logo-img" />
-                <div className="about-logo-text">
-                  <span className="about-product-name">{appName || 'Kingdee Lingee'}</span>
-                </div>
-              </div>
-              {appVersion && (
-                <div className="about-version-badge">v{appVersion}</div>
-              )}
-              <div className="about-links">
-                <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">{t(lang, 'aboutWebsite')}</a>
-                <span className="about-links-sep" />
-                <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">{t(lang, 'aboutTerms')}</a>
-                <span className="about-links-sep" />
-                <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">{t(lang, 'aboutPrivacy')}</a>
-              </div>
-              <div className="about-copyright">Copyright &copy; 2026 Kingdee. All rights reserved.</div>
-            </div>
-          </div>
-        </>
-      )}
+      <AboutDialog visible={showAbout} onClose={() => setShowAbout(false)} appVersion={appVersion} appName={appName} lang={lang} />
     </div>
   )
 }

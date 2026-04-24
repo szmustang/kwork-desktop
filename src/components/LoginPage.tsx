@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import { login, AuthError } from '../services/auth-api'
+import DropdownPanel from './DropdownPanel'
 import loginVideo from '../assets/loginvideo.mp4'
 import '../styles/login-page.css'
 
@@ -107,19 +108,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [langOpen, setLangOpen] = useState(false)
   const [showComingSoon, setShowComingSoon] = useState(false)
   const comingSoonTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const langRef = useRef<HTMLDivElement>(null)
-
-  // 点击外部关闭语言下拉
-  useEffect(() => {
-    if (!langOpen) return
-    const handleClick = (e: MouseEvent) => {
-      if (langRef.current && !langRef.current.contains(e.target as Node)) {
-        setLangOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [langOpen])
 
   const handleComingSoon = () => {
     setShowComingSoon(true)
@@ -270,42 +258,28 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       )}
 
       {/* 语言切换 */}
-      <div className="login-lang-switcher" ref={langRef}>
+      <div className="login-lang-switcher">
         <div className="login-lang-trigger" onClick={() => setLangOpen(!langOpen)}>
-          <svg className="login-lang-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10A15.3 15.3 0 0112 2z" />
+          <svg className="login-lang-globe" viewBox="0 0 16 16" fill="none">
+            <use href="icons.svg#lang-globe-icon" />
           </svg>
           <span className="login-lang-label">{t.langLabel}</span>
-          <svg className={`login-lang-arrow ${langOpen ? 'open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M6 9l6 6 6-6" />
+          <svg className={`login-lang-arrow ${langOpen ? 'open' : ''}`} viewBox="0 0 16 16" fill="none">
+            <use href="icons.svg#lang-arrow-icon" />
           </svg>
         </div>
         {langOpen && (
-          <div className="login-lang-dropdown">
-            <div
-              className={`login-lang-option ${lang === 'zh' ? 'active' : ''}`}
-              onClick={() => { switchLang('zh'); setLangOpen(false) }}
-            >
-              <span>简体中文</span>
-              {lang === 'zh' && (
-                <svg className="login-lang-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1677ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              )}
-            </div>
-            <div
-              className={`login-lang-option ${lang === 'en' ? 'active' : ''}`}
-              onClick={() => { switchLang('en'); setLangOpen(false) }}
-            >
-              <span>English</span>
-              {lang === 'en' && (
-                <svg className="login-lang-check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1677ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              )}
-            </div>
-          </div>
+          <DropdownPanel
+            className="login-lang-dropdown"
+            placement="right"
+            onClose={() => setLangOpen(false)}
+            options={[
+              { key: 'zh', label: '简体中文' },
+              { key: 'en', label: 'English' },
+            ]}
+            value={lang}
+            onSelect={(key) => { switchLang(key as Lang); setLangOpen(false) }}
+          />
         )}
       </div>
 

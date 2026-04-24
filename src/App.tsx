@@ -7,6 +7,7 @@ import DevTab from './components/DevTab'
 import { useOpenCodeSetup } from './components/dev/OpenCodeSetup'
 import { fetchUserProfile } from './services/user-api'
 import { t, type Lang } from './i18n'
+import AboutDialog from './components/AboutDialog'
 import './App.css'
 
 // 错误边界：防止子组件崩溃导致整个页面白屏
@@ -380,9 +381,14 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // 仅首次挂载时执行
 
-  // 未登录 → 显示登录页
+  // 未登录 → 显示登录页（仍需支持 About 弹窗）
   if (!user) {
-    return <LoginPage onLogin={handleLogin} />
+    return (
+      <>
+        <LoginPage onLogin={handleLogin} />
+        <AboutDialog visible={triggerAbout} onClose={() => setTriggerAbout(false)} appVersion={appVersion} appName={appName} lang={lang} />
+      </>
+    )
   }
 
   // 已登录 → 显示主界面
