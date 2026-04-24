@@ -28,13 +28,18 @@ contextBridge.exposeInMainWorld('lingeeBridge', {
   // ── Opencode 管理 ──
   checkOpencode: () => ipcRenderer.invoke('check-opencode'),
   getOpencodeVersion: () => ipcRenderer.invoke('get-opencode-version'),
-  checkPendingUpdate: () => ipcRenderer.invoke('check-pending-update'),
   installOpencode: () => ipcRenderer.invoke('install-opencode'),
   getInstallState: () => ipcRenderer.invoke('get-install-state'),
   onInstallProgress: (callback) => {
     const listener = (_event, progress) => callback(progress);
     ipcRenderer.on('opencode-install-progress', listener);
     return () => ipcRenderer.removeListener('opencode-install-progress', listener);
+  },
+  // 主进程后台检测到 opencode 新版本已预下载完成时推送
+  onOpencodeUpdateReady: (cb) => {
+    const listener = (_, data) => cb(data);
+    ipcRenderer.on('opencode-update-ready', listener);
+    return () => ipcRenderer.removeListener('opencode-update-ready', listener);
   },
 
   // ── OAuth2 认证 ──

@@ -4,7 +4,7 @@ import { t, type Lang, type MessageKey } from '../../i18n'
 /* ── Types for LingeeBridge IPC ── */
 
 interface LingeeBridgeOpenCodeAPI {
-  checkOpencode: () => Promise<{ installed: boolean; localVersion?: string | null; remoteVersion?: string | null }>
+  checkOpencode: () => Promise<{ installed: boolean }>
   getOpencodeVersion: () => Promise<{ version: string | null }>
   startSidecar: () => Promise<{ success: boolean; url?: string; error?: string }>
   installOpencode: () => Promise<{ success: boolean; error?: string }>
