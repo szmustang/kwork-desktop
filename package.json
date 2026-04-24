@@ -68,7 +68,7 @@
         "nsis",
         "zip"
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.ico"
     },
     "linux": {
       "target": [
@@ -78,7 +78,10 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
     }
   },
   "dependencies": {
