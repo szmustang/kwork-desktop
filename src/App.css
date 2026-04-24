@@ -81,7 +81,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: 0;
@@ -960,9 +960,15 @@ body {
 }
 
 .update-toast-icon {
-  font-size: 24px;
+  width: 56px;
+  height: 56px;
   flex-shrink: 0;
-  margin-top: 2px;
+  aspect-ratio: 1/1;
+}
+
+.update-toast-icon svg {
+  width: 56px;
+  height: 56px;
 }
 
 .update-toast-text {
@@ -1039,12 +1045,12 @@ body {
 }
 
 .update-toast-btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--primary-600, #2970FF);
+  border-color: var(--primary-600, #2970FF);
   color: #fff;
 }
 
 .update-toast-btn.primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: var(--primary-600, #2970FF);
+  border-color: var(--primary-600, #2970FF);
 }
