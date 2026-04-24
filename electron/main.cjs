@@ -21,7 +21,8 @@ const CLIENT_UPDATE_LOG_PATH = path.join(CLIENT_UPDATE_LOG_DIR, 'lingee-desktop-
 const CLIENT_UPDATE_LOG_MAX_SIZE = 1 * 1024 * 1024; // 1MB
 
 function clientUpdateLog(level, ...args) {
-  const ts = new Date().toLocaleString('zh-CN', { hour12: false });
+  const now = new Date();
+  const ts = now.toLocaleString('zh-CN', { hour12: false }) + '.' + String(now.getMilliseconds()).padStart(3, '0');
   const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
   const line = `[${ts}] [${level}] ${msg}\n`;
   // Console
