@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
-const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, checkOpencodeUpToDate, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents, resolveShellEnv } = require('./sidecar.cjs');
+const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, checkOpencodeInstalled, backgroundUpdateCheck, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents, resolveShellEnv } = require('./sidecar.cjs');
 const { startOAuth2Login } = require('./oauth2.cjs');
 const { LINGEE_BASE_URL } = require('./constants.cjs');
 const devServerURL = process.env.VITE_DEV_SERVER_URL;
@@ -179,7 +179,7 @@ ipcMain.handle('kill-sidecar', () => {
 
 // Opencode management IPC
 ipcMain.handle('check-opencode', async () => {
-  return await checkOpencodeUpToDate();
+  return checkOpencodeInstalled();
 });
 
 ipcMain.handle('get-opencode-version', async () => {
@@ -614,13 +614,48 @@ installEvents.on('progress', (data) => {
   }
 });
 
+/* ── Opencode Background Update Timer ── */
+const OPENCODE_BG_CHECK_DELAY = 1 * 60 * 1000;    // 首次延迟 1 分钟
+const OPENCODE_BG_CHECK_INTERVAL = 30 * 60 * 1000; // 之后每 30 分钟
+let bgCheckTimer = null;
+let bgCheckInterval = null;
+
+function startOpencodeBackgroundCheck() {
+  if (bgCheckTimer) return; // already started
+  console.log('[Main] Scheduling opencode background update check: delay=' + OPENCODE_BG_CHECK_DELAY + 'ms, interval=' + OPENCODE_BG_CHECK_INTERVAL + 'ms');
+
+  const doCheck = async () => {
+    try {
+      const result = await backgroundUpdateCheck();
+      if (result.hasUpdate && result.version && mainWindow && !mainWindow.isDestroyed()) {
+        console.log('[Main] Opencode update ready, notifying renderer: v' + result.version);
+        mainWindow.webContents.send('opencode-update-ready', { version: result.version });
+      }
+    } catch (err) {
+      console.error('[Main] Background update check error:', err.message);
+    }
+  };
+
+  bgCheckTimer = setTimeout(() => {
+    doCheck();
+    bgCheckInterval = setInterval(doCheck, OPENCODE_BG_CHECK_INTERVAL);
+  }, OPENCODE_BG_CHECK_DELAY);
+}
+
+function stopOpencodeBackgroundCheck() {
+  if (bgCheckTimer) { clearTimeout(bgCheckTimer); bgCheckTimer = null; }
+  if (bgCheckInterval) { clearInterval(bgCheckInterval); bgCheckInterval = null; }
+}
+
 app.whenReady().then(async () => {
   // Pre-resolve login-shell environment early (macOS GUI apps lack full PATH)
-  // This ensures nvm, kd, and other shell-profile tools are available to opencode
   resolveShellEnv().catch(() => {});
 
   // 初始化 bridge config 的 hostVersion
   currentBridgeConfig.hostVersion = app.getVersion();
+
+  // Start opencode background update checker
+  startOpencodeBackgroundCheck();
 
   // 自定义菜单，使 macOS 菜单栏显示正确的应用名称（必须在 app ready 之后）
   const appName = '金蝶灵基';
@@ -704,6 +739,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   forceQuit = true;
+  stopOpencodeBackgroundCheck();
   // 向所有 webview 发送停止信号，允许被嵌套端执行优雅退出
   broadcastToWebviews('lingeeBridge:stop-requested');
   killSidecar();

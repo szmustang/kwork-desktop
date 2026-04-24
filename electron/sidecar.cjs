@@ -17,7 +17,41 @@ const SERVER_JSON_PATH = path.join(KCODE_DIR, 'server.json');
 const UPDATES_DIR = path.join(KCODE_DIR, 'updates');
 const UPDATE_PENDING_PATH = path.join(UPDATES_DIR, 'update-pending.json');
 const DOWNLOAD_DIR = path.join(UPDATES_DIR, 'download');
+const DOWNLOAD_META_PATH = path.join(DOWNLOAD_DIR, '.download-meta.json');
+const UPDATER_LOG_PATH = path.join(UPDATES_DIR, 'updater.log');
 const CDN_BASE = 'http://app.cosmicstudio.cn/cosmicai/lingee/update/opencode';
+
+/* ── Updater Logger ── */
+
+/**
+ * Append a timestamped log line to ~/.kcode/updates/updater.log.
+ * Also prints to console for dev convenience.
+ * Log file is auto-rotated when exceeding 1MB.
+ */
+const UPDATER_LOG_MAX_SIZE = 1 * 1024 * 1024; // 1MB
+
+function updaterLog(level, ...args) {
+  const ts = new Date().toISOString();
+  const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+  const line = `[${ts}] [${level}] ${msg}\n`;
+  // Console output
+  if (level === 'ERROR') console.error('[Updater]', ...args);
+  else console.log('[Updater]', ...args);
+  // File output
+  try {
+    fs.mkdirSync(UPDATES_DIR, { recursive: true });
+    // Auto-rotate: if log exceeds max size, truncate to last half
+    try {
+      const stat = fs.statSync(UPDATER_LOG_PATH);
+      if (stat.size > UPDATER_LOG_MAX_SIZE) {
+        const content = fs.readFileSync(UPDATER_LOG_PATH, 'utf-8');
+        const halfPoint = content.indexOf('\n', Math.floor(content.length / 2));
+        fs.writeFileSync(UPDATER_LOG_PATH, content.slice(halfPoint + 1), 'utf-8');
+      }
+    } catch (_) { /* file may not exist yet */ }
+    fs.appendFileSync(UPDATER_LOG_PATH, line, 'utf-8');
+  } catch (_) { /* best effort */ }
+}
 
 /* ── Install event emitter (main.cjs listens for progress) ── */
 const installEvents = new EventEmitter();
@@ -147,7 +181,8 @@ function fetchJson(url) {
 }
 
 /**
- * Download a file with progress reporting.
+ * Download a file with progress reporting (no resume support).
+ * Used for first-time install where no partial file exists.
  * Returns the local file path.
  */
 function downloadFile(url, destPath, onProgress) {
@@ -156,7 +191,6 @@ function downloadFile(url, destPath, onProgress) {
     const client = url.startsWith('https') ? https : http;
     const req = client.get(url, { timeout: 60000 }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        // follow redirect
         res.resume();
         return downloadFile(res.headers.location, destPath, onProgress).then(resolve, reject);
       }
@@ -187,6 +221,90 @@ function downloadFile(url, destPath, onProgress) {
     req.on('timeout', () => {
       req.destroy();
       fs.unlink(destPath, () => {});
+      reject(new Error('Download timeout'));
+    });
+  });
+}
+
+/**
+ * Download a file with resume (Range header) support.
+ * If destPath already exists with partial content, resumes from that offset.
+ * If the server does not support Range, restarts from scratch.
+ * Returns the local file path.
+ */
+function downloadFileResumable(url, destPath, onProgress, expectedSize) {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
+
+    let existingSize = 0;
+    try {
+      const stat = fs.statSync(destPath);
+      existingSize = stat.size;
+    } catch (_) { /* file does not exist yet */ }
+
+    // If we already have the full file, skip download
+    if (expectedSize && existingSize >= expectedSize) {
+      updaterLog('INFO', 'File already fully downloaded:', destPath, `(${existingSize} bytes)`);
+      if (onProgress) onProgress(100);
+      return resolve(destPath);
+    }
+
+    const headers = {};
+    if (existingSize > 0) {
+      headers['Range'] = `bytes=${existingSize}-`;
+      updaterLog('INFO', 'Resuming download from byte', existingSize);
+    }
+
+    const client = url.startsWith('https') ? https : http;
+    const req = client.get(url, { timeout: 120000, headers }, (res) => {
+      // Follow redirect
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        return downloadFileResumable(res.headers.location, destPath, onProgress, expectedSize).then(resolve, reject);
+      }
+
+      // 206 Partial Content = resume accepted
+      // 200 OK = server doesn't support Range, restart from scratch
+      if (res.statusCode === 200 && existingSize > 0) {
+        updaterLog('INFO', 'Server does not support Range, restarting download');
+        existingSize = 0; // reset
+      } else if (res.statusCode !== 200 && res.statusCode !== 206) {
+        res.resume();
+        return reject(new Error(`HTTP ${res.statusCode} downloading ${url}`));
+      }
+
+      const contentLength = parseInt(res.headers['content-length'], 10) || 0;
+      const total = res.statusCode === 206 ? existingSize + contentLength : contentLength;
+      let downloaded = existingSize;
+
+      const fileFlags = res.statusCode === 206 ? 'a' : 'w'; // append or overwrite
+      const file = fs.createWriteStream(destPath, { flags: fileFlags });
+      res.on('data', (chunk) => {
+        downloaded += chunk.length;
+        if (total > 0 && onProgress) {
+          onProgress(Math.round((downloaded / total) * 100));
+        }
+      });
+      res.pipe(file);
+      file.on('finish', () => {
+        file.close(() => {
+          updaterLog('INFO', 'Download complete:', destPath, `(${downloaded} bytes)`);
+          resolve(destPath);
+        });
+      });
+      file.on('error', (err) => {
+        // Don't delete partial file — it can be resumed next time
+        reject(err);
+      });
+    });
+    req.on('error', (err) => {
+      // Don't delete partial file on network error — resume later
+      updaterLog('ERROR', 'Download network error:', err.message, '(partial file kept for resume)');
+      reject(err);
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      updaterLog('ERROR', 'Download timeout (partial file kept for resume)');
       reject(new Error('Download timeout'));
     });
   });
@@ -317,47 +435,192 @@ function isOpencodeInstalled() {
 }
 
 /**
- * Check if opencode is installed AND up-to-date with CDN latest.json.
- * If local version is outdated, delete old binary so installOpencode() can fetch the latest.
- * Returns { installed: boolean, localVersion, remoteVersion }
+ * Simple check: is opencode binary present?
+ * No CDN call, no version comparison, no deletion.
+ * Returns { installed: boolean }
  */
-async function checkOpencodeUpToDate() {
-  const binPath = getOpencodeBinPath();
-  const exists = fs.existsSync(binPath);
+function checkOpencodeInstalled() {
+  const exists = isOpencodeInstalled();
+  updaterLog('INFO', 'checkOpencodeInstalled:', exists);
+  return { installed: exists };
+}
 
-  // 1. Fetch CDN latest version
-  let remoteVersion = null;
+/**
+ * Background update check: fetch CDN latest.json, compare with local version,
+ * if newer → download to ~/.kcode/updates/download/ with resume support → write update-pending.json.
+ * Returns { hasUpdate, version, downloading } or { hasUpdate: false }.
+ * This runs silently in the background on a timer from main.cjs.
+ */
+let _bgCheckRunning = false;
+async function backgroundUpdateCheck() {
+  // Guard: prevent concurrent execution
+  if (_bgCheckRunning) {
+    updaterLog('INFO', 'Background update check skipped: previous check still running');
+    return { hasUpdate: false, reason: 'already_running' };
+  }
+  _bgCheckRunning = true;
   try {
-    const latest = await fetchJson(`${CDN_BASE}/latest.json`);
-    remoteVersion = latest.version || null;
-  } catch (err) {
-    console.warn('[Sidecar] CDN version check failed:', err.message);
-    // CDN unreachable: if binary exists, use it; if not, caller will trigger install
-    return { installed: exists, localVersion: null, remoteVersion: null };
+    return await _doBackgroundUpdateCheck();
+  } finally {
+    _bgCheckRunning = false;
+  }
+}
+
+async function _doBackgroundUpdateCheck() {
+  updaterLog('INFO', '=== Background update check started ===');
+
+  // 1. Must have opencode installed to compare versions
+  if (!isOpencodeInstalled()) {
+    updaterLog('INFO', 'opencode not installed, skipping background check');
+    return { hasUpdate: false, reason: 'not_installed' };
   }
 
-  // 2. Get local version
-  let localVersion = null;
-  if (exists) {
-    localVersion = await getOpencodeVersion();
-  }
-
-  // 3. Compare: needs update if not installed, version unknown, or outdated
-  const needsUpdate = !exists || !localVersion || !remoteVersion
-    || compareVersions(remoteVersion, localVersion) > 0;
-
-  if (needsUpdate && exists) {
-    // Delete outdated binary so installOpencode() will download the latest
+  // 2. Check if there's already a pending update ready to apply
+  if (fs.existsSync(UPDATE_PENDING_PATH)) {
     try {
-      fs.unlinkSync(binPath);
-      console.log('[Sidecar] Removed outdated opencode v' + localVersion + ' (CDN has v' + remoteVersion + ')');
+      const pending = JSON.parse(fs.readFileSync(UPDATE_PENDING_PATH, 'utf-8'));
+      const currentVer = await getOpencodeVersion();
+      if (pending.version && (!currentVer || compareVersions(pending.version, currentVer) > 0)) {
+        // Verify the download file actually exists
+        if (pending.binary && fs.existsSync(pending.binary)) {
+          updaterLog('INFO', 'Pending update v' + pending.version + ' already ready, notifying');
+          return { hasUpdate: true, version: pending.version, alreadyReady: true };
+        } else {
+          // Binary missing — don't cleanup, let CDN check below re-download
+          updaterLog('INFO', 'Pending update v' + pending.version + ' exists but binary missing, will re-download via CDN check');
+        }
+      } else {
+        // Stale pending — CDN check below will overwrite if newer version exists
+        updaterLog('INFO', 'Pending update v' + pending.version + ' is stale (current: v' + currentVer + '), skipping');
+      }
     } catch (err) {
-      console.warn('[Sidecar] Failed to remove old binary:', err.message);
+      // Corrupt pending json — CDN check below will overwrite if newer version exists
+      updaterLog('ERROR', 'Failed to read pending update:', err.message, ', skipping');
     }
   }
 
-  console.log('[Sidecar] checkUpToDate: local=' + localVersion + ' remote=' + remoteVersion + ' needsUpdate=' + needsUpdate);
-  return { installed: !needsUpdate, localVersion, remoteVersion };
+  // 3. Fetch CDN latest.json
+  const platformKey = getPlatformKey();
+  let latest;
+  try {
+    const latestUrl = `${CDN_BASE}/latest.json`;
+    updaterLog('INFO', 'Fetching', latestUrl);
+    latest = await fetchJson(latestUrl);
+    updaterLog('INFO', 'CDN latest version:', latest.version);
+  } catch (err) {
+    updaterLog('ERROR', 'CDN unreachable:', err.message);
+    return { hasUpdate: false, reason: 'cdn_error', error: err.message };
+  }
+
+  // 4. Compare with local version
+  const localVersion = await getOpencodeVersion();
+  const remoteVersion = latest.version;
+  updaterLog('INFO', 'Version comparison: local=' + localVersion + ' remote=' + remoteVersion);
+
+  if (!remoteVersion || (localVersion && compareVersions(remoteVersion, localVersion) <= 0)) {
+    updaterLog('INFO', 'Already up to date');
+    return { hasUpdate: false, localVersion, remoteVersion };
+  }
+
+  // 5. Match platform
+  const fileInfo = latest.files && latest.files[platformKey];
+  if (!fileInfo) {
+    updaterLog('ERROR', 'Platform', platformKey, 'not found in latest.json');
+    return { hasUpdate: false, reason: 'platform_unsupported' };
+  }
+
+  const assetName = fileInfo.name;
+  const expectedSha256 = (fileInfo.sha256 || '').toLowerCase();
+  const expectedSize = fileInfo.size || 0;
+  const downloadUrl = `${CDN_BASE}/${assetName}`;
+  const localPath = path.join(DOWNLOAD_DIR, assetName);
+
+  updaterLog('INFO', 'New version available: v' + remoteVersion + ', downloading', assetName);
+
+  // 6. Pre-check: if a partial file exists, verify it belongs to the same version.
+  //    Compare against stored download metadata to detect version change.
+  if (fs.existsSync(localPath)) {
+    let shouldDelete = false;
+    try {
+      if (fs.existsSync(DOWNLOAD_META_PATH)) {
+        const meta = JSON.parse(fs.readFileSync(DOWNLOAD_META_PATH, 'utf-8'));
+        if (meta.version !== remoteVersion || meta.sha256 !== expectedSha256) {
+          updaterLog('INFO', 'Partial file belongs to v' + meta.version + ' but now need v' + remoteVersion + ', deleting stale file');
+          shouldDelete = true;
+        }
+      } else {
+        // No metadata file — can't verify, safer to delete and re-download
+        updaterLog('INFO', 'Partial file exists but no download metadata, deleting to be safe');
+        shouldDelete = true;
+      }
+    } catch (err) {
+      updaterLog('WARN', 'Failed to read download metadata:', err.message);
+      shouldDelete = true;
+    }
+    if (shouldDelete) {
+      try { fs.unlinkSync(localPath); } catch (_) {}
+      try { fs.unlinkSync(DOWNLOAD_META_PATH); } catch (_) {}
+    }
+  }
+
+  // Write download metadata so we can verify on resume after restart
+  try {
+    fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+    fs.writeFileSync(DOWNLOAD_META_PATH, JSON.stringify({
+      version: remoteVersion,
+      sha256: expectedSha256,
+      expectedSize,
+      assetName,
+      startedAt: new Date().toISOString(),
+    }), 'utf-8');
+  } catch (err) {
+    updaterLog('WARN', 'Failed to write download metadata:', err.message);
+  }
+
+  // 7. Download with resume support
+  try {
+    await downloadFileResumable(downloadUrl, localPath, (percent) => {
+      // Silent background download, no UI events
+      if (percent % 20 === 0) updaterLog('INFO', 'Background download progress:', percent + '%');
+    }, expectedSize);
+  } catch (err) {
+    updaterLog('ERROR', 'Background download failed:', err.message, '(will retry next cycle)');
+    return { hasUpdate: false, reason: 'download_failed', error: err.message };
+  }
+
+  // 7. SHA256 verify
+  if (expectedSha256) {
+    const computed = sha256File(localPath);
+    if (computed !== expectedSha256) {
+      updaterLog('ERROR', 'SHA256 mismatch! expected:', expectedSha256, 'got:', computed);
+      try { fs.unlinkSync(localPath); } catch (_) {}
+      try { fs.unlinkSync(DOWNLOAD_META_PATH); } catch (_) {}
+      return { hasUpdate: false, reason: 'sha256_mismatch' };
+    }
+    updaterLog('INFO', 'SHA256 verification passed');
+  }
+
+  // 8. Write update-pending.json
+  const pendingData = {
+    version: remoteVersion,
+    binary: localPath,
+    sha256: expectedSha256,
+    downloadedAt: new Date().toISOString(),
+    platform: platformKey,
+  };
+  try {
+    fs.mkdirSync(UPDATES_DIR, { recursive: true });
+    fs.writeFileSync(UPDATE_PENDING_PATH, JSON.stringify(pendingData, null, 2), 'utf-8');
+    updaterLog('INFO', 'Written update-pending.json for v' + remoteVersion);
+    // Clean up download metadata — no longer needed
+    try { fs.unlinkSync(DOWNLOAD_META_PATH); } catch (_) {}
+  } catch (err) {
+    updaterLog('ERROR', 'Failed to write update-pending.json:', err.message);
+    return { hasUpdate: false, reason: 'write_failed', error: err.message };
+  }
+
+  updaterLog('INFO', '=== Background update check complete: v' + remoteVersion + ' ready ===');
+  return { hasUpdate: true, version: remoteVersion };
 }
 
 /**
@@ -471,7 +734,7 @@ function sha256File(filePath) {
 async function applyPendingUpdate() {
   // 1. Check existence
   if (!fs.existsSync(UPDATE_PENDING_PATH)) {
-    console.log('[Sidecar] No pending update');
+    updaterLog('INFO', 'No pending update');
     return { applied: false };
   }
 
@@ -480,26 +743,26 @@ async function applyPendingUpdate() {
   try {
     pending = JSON.parse(fs.readFileSync(UPDATE_PENDING_PATH, 'utf-8'));
   } catch (err) {
-    console.error('[Sidecar] Bad update-pending.json:', err.message);
+    updaterLog('ERROR', 'Bad update-pending.json:', err.message);
     cleanupPendingUpdate();
     return { applied: false, error: 'parse_error' };
   }
 
   const { version: pendingVer, binary, sha256, forced } = pending;
-  console.log('[Sidecar] Pending update v' + pendingVer, '| binary:', binary, '| forced:', forced);
+  updaterLog('INFO', 'Pending update v' + pendingVer, '| binary:', binary, '| forced:', forced);
 
   // 3. Compare with local version
   const currentVer = await getOpencodeVersion();
   if (currentVer && compareVersions(pendingVer, currentVer) <= 0) {
-    console.log('[Sidecar] Pending v' + pendingVer, '<= local v' + currentVer + ', skipping');
+    updaterLog('INFO', 'Pending v' + pendingVer + ' <= local v' + currentVer + ', skipping');
     cleanupPendingUpdate();
     return { applied: false, reason: 'not_newer' };
   }
-  console.log('[Sidecar] Updating: local v' + (currentVer || 'unknown'), '→ v' + pendingVer);
+  updaterLog('INFO', 'Applying update: local v' + (currentVer || 'unknown') + ' → v' + pendingVer);
 
   // 4. Verify archive exists
   if (!binary || !fs.existsSync(binary)) {
-    console.error('[Sidecar] Archive not found:', binary);
+    updaterLog('ERROR', 'Archive not found:', binary);
     cleanupPendingUpdate();
     return { applied: false, error: 'archive_missing' };
   }
@@ -508,11 +771,11 @@ async function applyPendingUpdate() {
   if (sha256) {
     const computed = sha256File(binary);
     if (computed !== sha256.toLowerCase()) {
-      console.error('[Sidecar] SHA256 mismatch! expected:', sha256, 'got:', computed);
+      updaterLog('ERROR', 'SHA256 mismatch! expected:', sha256, 'got:', computed);
       cleanupPendingUpdate();
       return { applied: false, error: 'sha256_mismatch' };
     }
-    console.log('[Sidecar] SHA256 OK');
+    updaterLog('INFO', 'SHA256 verification passed');
   }
 
   // 6. Extract and replace
@@ -525,9 +788,10 @@ async function applyPendingUpdate() {
   try {
     if (fs.existsSync(destBin)) {
       fs.copyFileSync(destBin, backupPath);
+      updaterLog('INFO', 'Backed up old binary to', backupPath);
     }
   } catch (err) {
-    console.warn('[Sidecar] Backup failed:', err.message);
+    updaterLog('ERROR', 'Backup failed:', err.message);
   }
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-update-'));
@@ -539,21 +803,21 @@ async function applyPendingUpdate() {
     fs.copyFileSync(extracted, destBin);
     if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
 
-    console.log('[Sidecar] Updated opencode to v' + pendingVer);
+    updaterLog('INFO', 'Successfully updated opencode to v' + pendingVer);
     cleanupPendingUpdate();
     try { fs.unlinkSync(backupPath); } catch (_) {}
     return { applied: true, version: pendingVer };
   } catch (err) {
-    console.error('[Sidecar] Update failed:', err.message);
+    updaterLog('ERROR', 'Update extraction failed:', err.message);
     // Rollback
     try {
       if (fs.existsSync(backupPath)) {
         fs.copyFileSync(backupPath, destBin);
         if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
-        console.log('[Sidecar] Rolled back to previous binary');
+        updaterLog('INFO', 'Rolled back to previous binary');
       }
     } catch (rbErr) {
-      console.error('[Sidecar] Rollback failed:', rbErr.message);
+      updaterLog('ERROR', 'Rollback failed:', rbErr.message);
     }
     cleanupPendingUpdate();
     return { applied: false, error: 'extract_failed' };
@@ -563,49 +827,40 @@ async function applyPendingUpdate() {
 }
 
 /**
- * Remove update-pending.json and clean download directory.
+ * Clean up download directory after apply.
+ * NOTE: update-pending.json is NEVER deleted — it can only be overwritten
+ * after a successful download + SHA256 verification in backgroundUpdateCheck().
  */
 function cleanupPendingUpdate() {
-  try {
-    if (fs.existsSync(UPDATE_PENDING_PATH)) fs.unlinkSync(UPDATE_PENDING_PATH);
-  } catch (err) {
-    console.warn('[Sidecar] Failed to remove update-pending.json:', err.message);
-  }
   const dlDir = path.join(UPDATES_DIR, 'download');
   try {
     if (fs.existsSync(dlDir)) fs.rmSync(dlDir, { recursive: true, force: true });
+    updaterLog('INFO', 'Cleaned up download directory');
   } catch (err) {
-    console.warn('[Sidecar] Failed to clean download dir:', err.message);
+    updaterLog('ERROR', 'Failed to clean download dir:', err.message);
   }
 }
 
 /**
- * Check if there's a pending update available.
+ * Check if there's a pending update available (used internally by main.cjs).
  * Returns { hasUpdate: boolean, version?: string, currentVersion?: string }
  */
 async function checkPendingUpdate() {
-  // 1. Check existence
   if (!fs.existsSync(UPDATE_PENDING_PATH)) {
     return { hasUpdate: false };
   }
-
-  // 2. Parse
   let pending;
   try {
     pending = JSON.parse(fs.readFileSync(UPDATE_PENDING_PATH, 'utf-8'));
   } catch (err) {
-    console.error('[Sidecar] Bad update-pending.json:', err.message);
+    updaterLog('ERROR', 'Bad update-pending.json:', err.message);
     return { hasUpdate: false, error: 'parse_error' };
   }
-
   const { version: pendingVer } = pending;
-  
-  // 3. Compare with local version
   const currentVer = await getOpencodeVersion();
   if (currentVer && compareVersions(pendingVer, currentVer) <= 0) {
     return { hasUpdate: false, version: pendingVer, currentVersion: currentVer };
   }
-  
   return { hasUpdate: true, version: pendingVer, currentVersion: currentVer };
 }
 
@@ -877,7 +1132,8 @@ module.exports = {
   killSidecar,
   getServerInfo,
   isOpencodeInstalled,
-  checkOpencodeUpToDate,
+  checkOpencodeInstalled,
+  backgroundUpdateCheck,
   getOpencodeVersion,
   applyPendingUpdate,
   checkPendingUpdate,

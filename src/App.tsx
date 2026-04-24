@@ -35,33 +35,30 @@ const tabKeys: TabKey[] = ['chat', 'work', 'dev']
 
 /* ── 右下角更新提示弹窗 ── */
 
-const OPENCODE_CHECK_INTERVAL = 30 * 60 * 1000    // opencode: 30 分钟
 const CLIENT_CHECK_INTERVAL = 60 * 60 * 1000      // 客户端: 1 小时
-const OPENCODE_CHECK_DELAY = 5 * 60 * 1000        // opencode 首次检测延迟: 5 分钟
-const CLIENT_CHECK_DELAY = 1 * 60 * 1000          // 客户端首次检测延迟: 1 分钟（测试用）
+const CLIENT_CHECK_DELAY = 1 * 60 * 1000          // 客户端首次检测延迟: 1 分钟
 
 function UpdateToast({ lang }: { lang: Lang }) {
   const [updateInfo, setUpdateInfo] = useState<{ version: string; type: 'opencode' | 'client' } | null>(null)
   const [downloading, setDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [downloadError, setDownloadError] = useState<string | null>(null)
-  const relaunchingRef = useRef(false)  // 标记是否正在重启安装，防止 error 事件干扰
-  const downloadingRef = useRef(false)  // 用 ref 跟踪下载状态，避免闭包捕获旧值
+  const relaunchingRef = useRef(false)
+  const downloadingRef = useRef(false)
 
-  // 检查 opencode 更新
-  const checkOpencodeUpdate = useCallback(async () => {
+  // 监听主进程后台推送的 opencode 更新就绪事件（已预下载完成）
+  useEffect(() => {
     const api = (window as any).lingeeBridge
-    if (!api?.checkPendingUpdate) return
+    if (!api?.onOpencodeUpdateReady) return
 
-    try {
-      const result = await api.checkPendingUpdate()
-      console.log('[UpdateToast] opencode check result:', JSON.stringify(result))
-      if (result.hasUpdate && result.version && !updateInfo) {
-        setUpdateInfo({ version: result.version, type: 'opencode' })
+    const removeOpencodeReady = api.onOpencodeUpdateReady((data: { version: string }) => {
+      console.log('[UpdateToast] Opencode update ready (pre-downloaded):', data.version)
+      if (!updateInfo) {
+        setUpdateInfo({ version: data.version, type: 'opencode' })
       }
-    } catch (err) {
-      console.warn('[UpdateToast] opencode check failed:', err)
-    }
+    })
+
+    return () => removeOpencodeReady?.()
   }, [updateInfo])
 
   // 检查客户端更新
@@ -130,21 +127,15 @@ function UpdateToast({ lang }: { lang: Lang }) {
   }, [updateInfo])
 
   useEffect(() => {
-    // opencode: 5 分钟后首次检查，之后每 30 分钟
-    const opencodeTimer = setTimeout(checkOpencodeUpdate, OPENCODE_CHECK_DELAY)
-    const opencodeInterval = setInterval(checkOpencodeUpdate, OPENCODE_CHECK_INTERVAL)
-    
     // 客户端: 1 分钟后首次检查，之后每 1 小时
     const clientTimer = setTimeout(checkClientUpdate, CLIENT_CHECK_DELAY)
     const clientInterval = setInterval(checkClientUpdate, CLIENT_CHECK_INTERVAL)
     
     return () => {
-      clearTimeout(opencodeTimer)
-      clearInterval(opencodeInterval)
       clearTimeout(clientTimer)
       clearInterval(clientInterval)
     }
-  }, [checkOpencodeUpdate, checkClientUpdate])
+  }, [checkClientUpdate])
 
   const handleUpdate = () => {
     const api = (window as any).lingeeBridge
