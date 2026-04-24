@@ -31,7 +31,7 @@ const CDN_BASE = 'http://app.cosmicstudio.cn/cosmicai/lingee/update/opencode';
 const UPDATER_LOG_MAX_SIZE = 1 * 1024 * 1024; // 1MB
 
 function updaterLog(level, ...args) {
-  const ts = new Date().toISOString();
+  const ts = new Date().toLocaleString('zh-CN', { hour12: false });
   const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
   const line = `[${ts}] [${level}] ${msg}\n`;
   // Console output
