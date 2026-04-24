@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { UserInfo } from './LoginPage'
 import { t, type Lang } from '../i18n'
 import AboutDialog from './AboutDialog'
+import ConfirmDialog from './ConfirmDialog'
+import DropdownPanel from './DropdownPanel'
 import defaultAvatar from '../assets/linggeeuser.jpg'
 
 interface UserDropdownProps {
@@ -21,11 +23,15 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
   const [open, setOpen] = useState(false)
   const [showAbout, setShowAbout] = useState(false)
   const [showLangSub, setShowLangSub] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
+  const onAboutClosedRef = useRef(onAboutClosed)
+  onAboutClosedRef.current = onAboutClosed
 
   useEffect(() => {
     if (externalShowAbout) {
       setShowAbout(true)
-      onAboutClosed?.()
+      onAboutClosedRef.current?.()
     }
   }, [externalShowAbout])
 
@@ -43,6 +49,17 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
     setShowLangSub(v => !v)
   }
 
+  const handleLogoutClick = () => {
+    setOpen(false)
+    setShowLangSub(false)
+    setShowLogoutConfirm(true)
+  }
+
+  const handleLogoutConfirm = () => {
+    setShowLogoutConfirm(false)
+    onLogout()
+  }
+
   return (
     <div className="user-dropdown-wrapper">
       {/* 全屏透明遮罩：点击任意位置关闭下拉面板 */}
@@ -50,16 +67,15 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
 
       {/* 文件夹图标 */}
       <button className="topbar-icon-btn" title={t(lang, 'fileTitle')}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <use href="/icons.svg#folder-open-icon" />
         </svg>
       </button>
 
       {/* 通知铃铛 */}
       <button className="topbar-icon-btn" title={t(lang, 'notifyTitle')}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 01-3.46 0" />
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <use href="/icons.svg#notification-icon" />
         </svg>
       </button>
 
@@ -69,14 +85,15 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
         onClick={() => setOpen(!open)}
       >
         <img src={avatarSrc} alt={initials} className="user-avatar-img" />
+        <span className="user-avatar-status" />
       </div>
 
       {/* 下拉面板 */}
       {open && (
         <div className="user-dropdown-panel">
           <div className="user-dropdown-info">
-            <div className="user-dropdown-name">{user.displayName}</div>
-            <div className="user-dropdown-role">{user.role}</div>
+            <div className="user-dropdown-name" title={user.displayName}>{user.displayName}</div>
+            <div className="user-dropdown-role" title={user.role}>{user.role}</div>
           </div>
           <div className="user-dropdown-divider" />
           {/* 语言选择 */}
@@ -84,58 +101,58 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
             className="user-dropdown-action user-dropdown-lang-trigger"
             onClick={handleLangToggle}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10A15.3 15.3 0 0112 2z" />
+            <svg className="user-dropdown-action-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <g clipPath="url(#clip-globe-normal)">
+                <path fillRule="evenodd" clipRule="evenodd" d="M7.99984 15.3333C12.0499 15.3333 15.3332 12.05 15.3332 7.99992C15.3332 3.94983 12.0499 0.666586 7.99984 0.666586C3.94975 0.666586 0.666504 3.94983 0.666504 7.99992C0.666504 12.05 3.94975 15.3333 7.99984 15.3333ZM6.01351 7.33325C6.07572 5.82909 6.34541 4.50268 6.73291 3.53377C6.9556 2.97704 7.20462 2.57074 7.44645 2.31502C7.68685 2.0609 7.87406 1.99992 7.99984 1.99992C8.12561 1.99992 8.31283 2.0609 8.55322 2.31502C8.79505 2.57074 9.04407 2.97704 9.26676 3.53377C9.65426 4.50268 9.92396 5.82909 9.98617 7.33325H6.01351ZM2.0376 7.33325C2.28473 5.09806 3.75927 3.2346 5.77262 2.42896C5.67325 2.62206 5.58031 2.82576 5.49528 3.03833C5.0355 4.1878 4.74234 5.6885 4.67952 7.33325H2.0376ZM11.3201 7.33325C11.2573 5.6885 10.9642 4.1878 10.5044 3.03833C10.4193 2.82566 10.3258 2.62214 10.2264 2.42896C12.24 3.23448 13.7149 5.09786 13.9621 7.33325H11.3201ZM5.77262 13.5715C3.75915 12.7659 2.28474 10.9019 2.0376 8.66659H4.67952C4.74234 10.3113 5.0355 11.812 5.49528 12.9615C5.58038 13.1743 5.67315 13.3783 5.77262 13.5715ZM7.99984 13.9999C7.87406 13.9999 7.68685 13.9389 7.44645 13.6848C7.20462 13.4291 6.9556 13.0228 6.73291 12.4661C6.34541 11.4972 6.07572 10.1708 6.01351 8.66659H9.98617C9.92396 10.1708 9.65426 11.4972 9.26676 12.4661C9.04407 13.0228 8.79505 13.4291 8.55322 13.6848C8.31283 13.9389 8.12561 13.9999 7.99984 13.9999ZM10.2264 13.5715C10.3259 13.3782 10.4192 13.1744 10.5044 12.9615C10.9642 11.812 11.2573 10.3113 11.3201 8.66659H13.9621C13.7149 10.9021 12.2402 12.7661 10.2264 13.5715Z" fill="black" fillOpacity="0.64"/>
+              </g>
+              <defs>
+                <clipPath id="clip-globe-normal">
+                  <rect width="16" height="16" fill="white" transform="matrix(1 0 0 -1 0 16)"/>
+                </clipPath>
+              </defs>
             </svg>
-            <span>{t(lang, 'langSelect')}</span>
-            <svg className="user-dropdown-lang-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M9 18l6-6-6-6" />
+            <span className="user-dropdown-action-label">{t(lang, 'langSelect')}</span>
+            <svg className="user-dropdown-lang-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M5.86177 12.4715C6.12212 12.7318 6.54423 12.7318 6.80458 12.4715L10.8046 8.47149C11.0649 8.21114 11.0649 7.78903 10.8046 7.52868L6.80458 3.52868C6.54423 3.26833 6.12212 3.26833 5.86177 3.52868C5.60142 3.78903 5.60142 4.21114 5.86177 4.47149L9.39036 8.00008L5.86177 11.5287C5.60142 11.789 5.60142 12.2111 5.86177 12.4715Z" fill="black" fillOpacity="0.28"/>
             </svg>
-            {/* 语言子面板 */}
+            {/* 语言子面板：复用 DropdownPanel 组件 */}
             {showLangSub && (
-              <div
-                className="user-dropdown-lang-sub"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div
-                  className={`user-dropdown-lang-option ${lang === 'zh' ? 'active' : ''}`}
-                  onClick={() => handleLangChange('zh')}
-                >
-                  <span>{t(lang, 'langZh')}</span>
-                  {lang === 'zh' && (
-                    <svg className="user-dropdown-lang-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1677ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </div>
-                <div
-                  className={`user-dropdown-lang-option ${lang === 'en' ? 'active' : ''}`}
-                  onClick={() => handleLangChange('en')}
-                >
-                  <span>{t(lang, 'langEn')}</span>
-                  {lang === 'en' && (
-                    <svg className="user-dropdown-lang-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1677ff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
-                </div>
+              <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 0, left: 0 }}>
+                <DropdownPanel
+                  className="user-dropdown-lang-panel"
+                  options={[
+                    { key: 'zh', label: t(lang, 'langZh') },
+                    { key: 'en', label: t(lang, 'langEn') },
+                  ]}
+                  value={lang}
+                  onSelect={(key) => handleLangChange(key as Lang)}
+                />
               </div>
             )}
           </div>
           {/* 退出登录 */}
-          <button className="user-dropdown-logout" onClick={onLogout}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
+          <button className="user-dropdown-logout" onClick={handleLogoutClick}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M9.20438 1.6025C9.37969 1.29569 9.77061 1.18914 10.0775 1.36437C10.3106 1.49748 10.5351 1.64422 10.7494 1.80312C11.1161 2.07506 11.4537 2.38343 11.7569 2.7225C12.803 3.89249 13.44 5.43237 13.44 7.11875C13.4399 10.7944 10.4234 13.76 6.72 13.76C3.01659 13.76 0.000103848 10.7944 0 7.11875C0 5.43237 0.636958 3.89249 1.68313 2.7225C1.98634 2.38343 2.32388 2.07506 2.69062 1.80312C2.90494 1.64422 3.12941 1.49748 3.3625 1.36437C3.66939 1.18914 4.06031 1.29569 4.23562 1.6025C4.41086 1.90939 4.30431 2.30031 3.9975 2.47563C3.80864 2.58347 3.62673 2.70253 3.45312 2.83125C3.15602 3.05153 2.88229 3.30118 2.63687 3.57562C1.79117 4.52151 1.28 5.76114 1.28 7.11875C1.2801 10.0719 3.70777 12.48 6.72 12.48C9.73223 12.48 12.1599 10.0719 12.16 7.11875C12.16 5.76114 11.6488 4.52151 10.8031 3.57562C10.5577 3.30118 10.284 3.05153 9.98687 2.83125C9.81327 2.70253 9.63136 2.58347 9.4425 2.47563C9.13569 2.30031 9.02914 1.90939 9.20438 1.6025ZM6.72 0C7.07346 0 7.36 0.286538 7.36 0.64V7.04C7.36 7.39346 7.07346 7.68 6.72 7.68C6.36654 7.68 6.08 7.39346 6.08 7.04V0.64C6.08 0.286538 6.36654 0 6.72 0Z" fill="black" fillOpacity="0.64"/>
             </svg>
-            <span>{t(lang, 'logout')}</span>
+            <span className="user-dropdown-action-label">{t(lang, 'logout')}</span>
           </button>
         </div>
       )}
 
       {/* 关于弹窗 */}
       <AboutDialog visible={showAbout} onClose={() => setShowAbout(false)} appVersion={appVersion} appName={appName} lang={lang} />
+
+      {/* 退出确认弹窗 */}
+      <ConfirmDialog
+        visible={showLogoutConfirm}
+        title={t(lang, 'logoutTitle')}
+        message={t(lang, 'logoutMessage')}
+        confirmText={t(lang, 'confirmOk')}
+        cancelText={t(lang, 'confirmCancel')}
+        onConfirm={handleLogoutConfirm}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
     </div>
   )
 }

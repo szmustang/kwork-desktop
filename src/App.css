@@ -16,7 +16,7 @@
   --danger: #d1242f;
   --success: #1a7f37;
   --radius: 8px;
-  --topbar-height: 48px;
+  --topbar-height: 56px;
   color-scheme: light;
 }
 
@@ -38,7 +38,7 @@
   --danger: #ef5350;
   --success: #4caf50;
   --radius: 8px;
-  --topbar-height: 48px;
+  --topbar-height: 56px;
   color-scheme: dark;
 }
 
@@ -165,16 +165,24 @@ body {
   -webkit-app-region: no-drag;
   background: var(--black-3, rgba(0, 0, 0, 0.03));
   border-radius: 20px;
-  padding: 3px 4px;
+  padding: 4px;
 }
 
 .tab-btn {
-  padding: 5px 20px;
+  display: flex;
+  height: 32px;
+  padding: 0 16px;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
   border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 500;
+  color: rgba(0, 0, 0, 0.64);
+  text-align: center;
+  font-feature-settings: 'liga' off, 'calt' off;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
   border-radius: 16px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -187,7 +195,7 @@ body {
 
 .tab-btn.active {
   background: var(--bg-primary);
-  color: var(--text-primary);
+  color: rgba(0, 0, 0, 0.94);
   font-weight: 600;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
@@ -256,18 +264,18 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--text-muted);
+  padding: 0;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: opacity 0.15s;
 }
 .topbar-icon-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  opacity: 0.7;
 }
 
 /* ===== 用户下拉菜单 ===== */
@@ -285,25 +293,24 @@ body {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .user-avatar-btn {
   width: 24px;
   height: 24px;
-  border-radius: 50%;
+  border-radius: 60px;
   border: none;
   background: transparent;
-  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: 11px;
   cursor: pointer;
   transition: box-shadow 0.15s;
   user-select: none;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
+  flex-shrink: 0;
 }
 .user-avatar-btn:hover,
 .user-avatar-btn.active {
@@ -311,29 +318,44 @@ body {
 }
 
 .user-avatar-img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 60px;
   object-fit: cover;
+  flex-shrink: 0;
+}
+
+.user-avatar-status {
+  width: 6px;
+  height: 6px;
+  position: absolute;
+  right: 0.6px;
+  bottom: 0.6px;
+  border-radius: 73.8px;
+  border: 0.9px solid var(--Neutral-Colors-0, #FFF);
+  background: var(--Secondary-Colors-Green-500, #34C759);
 }
 
 .user-dropdown-panel {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 200px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  width: 128px;
+  background: #FFF;
+  border-radius: 16px;
+  border: 0.5px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.08);
   z-index: 1000;
   overflow: visible;
   animation: dropdown-fade-in 0.15s ease-out;
-  padding: 4px 0;
+  padding: 4px;
+  box-sizing: border-box;
 }
 
 [data-theme="dark"] .user-dropdown-panel {
   background: var(--bg-secondary);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.3);
 }
 
 @keyframes dropdown-fade-in {
@@ -342,116 +364,146 @@ body {
 }
 
 .user-dropdown-info {
-  padding: 16px 16px 12px;
+  padding: 8px 8px 0;
 }
 
 .user-dropdown-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 2px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  color: var(--ListItem-Text-Text-Dack, #060606);
+  font-feature-settings: 'liga' off, 'clig' off;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
 }
 
 .user-dropdown-role {
-  font-size: 13px;
-  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  align-self: stretch;
+  overflow: hidden;
+  color: var(--ListItem-Text-Text-Neutral, #808080);
+  font-feature-settings: 'liga' off, 'clig' off;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 16px;
+  margin-top: 2px;
+  margin-bottom: 8px;
 }
 
 .user-dropdown-divider {
-  height: 1px;
-  background: var(--border-color);
-  margin: 0 12px;
+  height: 0.5px;
+  background: var(--black-3, rgba(0, 0, 0, 0.03));
+  margin: 0;
 }
 
 .user-dropdown-logout {
   display: flex;
+  width: 120px;
+  height: 32px;
+  padding: 0 8px;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  padding: 12px 16px;
+  border-radius: 12px;
   border: none;
   background: transparent;
-  color: #e5534b;
-  font-size: 14px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
+  box-sizing: border-box;
 }
 .user-dropdown-logout:hover {
-  background: rgba(229, 83, 75, 0.08);
-  color: #d1242f;
+  background: var(--danger-50, #FFF0F1);
 }
-.user-dropdown-logout svg {
-  stroke: currentColor;
+.user-dropdown-logout .user-dropdown-action-label {
+  overflow: hidden;
+  color: var(--82-black, var(--neutral-700, rgba(0, 0, 0, 0.82)));
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.user-dropdown-logout:hover .user-dropdown-action-label {
+  color: var(--danger-600, #FF293B);
+}
+.user-dropdown-logout svg path {
+  fill: var(--neutral-600, rgba(0, 0, 0, 0.64));
+  transition: fill 0.15s;
+}
+.user-dropdown-logout:hover svg path {
+  fill: var(--danger-600, #FF293B);
 }
 
 .user-dropdown-action {
   display: flex;
+  width: 120px;
+  height: 32px;
+  padding: 0 8px;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  padding: 12px 16px;
+  border-radius: 12px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
-  font-size: 14px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
+  box-sizing: border-box;
 }
 .user-dropdown-action:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: var(--neutral-50, rgba(0, 0, 0, 0.03));
+}
+.user-dropdown-action-label {
+  overflow: hidden;
+  color: var(--82-black, var(--neutral-700, rgba(0, 0, 0, 0.82)));
+  text-overflow: ellipsis;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 18px;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.user-dropdown-action:hover .user-dropdown-action-label {
+  color: var(--94-black-212121, var(--neutral-900, rgba(0, 0, 0, 0.94)));
+}
+.user-dropdown-action-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.user-dropdown-action-icon path {
+  transition: fill-opacity 0.15s;
+}
+.user-dropdown-action:hover .user-dropdown-action-icon path {
+  fill-opacity: 0.94;
 }
 
 /* ===== 语言选择触发器 ===== */
 .user-dropdown-lang-trigger {
   position: relative;
+  margin-top: 4px;
 }
 
 .user-dropdown-lang-arrow {
   margin-left: auto;
-}
-
-/* ===== 语言子面板 ===== */
-.user-dropdown-lang-sub {
-  position: absolute;
-  right: calc(100% + 4px);
-  top: 0;
-  width: 180px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
-  z-index: 1001;
-  overflow: hidden;
-  padding: 8px 0;
-  animation: dropdown-fade-in 0.15s ease-out;
-}
-
-[data-theme="dark"] .user-dropdown-lang-sub {
-  background: var(--bg-secondary);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.user-dropdown-lang-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  font-size: 14px;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.user-dropdown-lang-option:hover {
-  background: var(--bg-hover);
-}
-
-.user-dropdown-lang-option.active {
-  font-weight: 500;
-}
-
-.user-dropdown-lang-check {
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
+}
+
+/* ===== 语言子面板（复用 DropdownPanel 组件，仅覆盖定位） ===== */
+.dropdown-panel-popover.user-dropdown-lang-panel {
+  top: 0;
+  left: auto;
+  right: calc(100% + 8px);
+  z-index: 1001;
 }
 
 /* ===== 关于弹窗 ===== */

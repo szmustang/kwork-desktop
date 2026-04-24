@@ -83,3 +83,25 @@ export async function login(req: LoginRequest): Promise<LoginResponse> {
   }
   return data
 }
+
+/**
+ * 调用 POST /auth/logout 进行登出
+ *
+ * @param token 用户的认证 token
+ * @throws {Error} 网络异常或服务端返回非 2xx
+ */
+export async function logout(token: string): Promise<void> {
+  const res = await fetch(`${AUTH_BASE_URL}/openwork/auth/logout`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+    credentials: 'include',
+  })
+
+  if (!res.ok) {
+    throw new Error(`Logout failed with status ${res.status}`)
+  }
+}

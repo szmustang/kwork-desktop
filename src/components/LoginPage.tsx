@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import { login, AuthError } from '../services/auth-api'
 import DropdownPanel from './DropdownPanel'
+import TopToast from './TopToast'
 import loginVideo from '../assets/loginvideo.mp4'
 import '../styles/login-page.css'
 
@@ -40,6 +41,8 @@ const i18n: Record<Lang, Record<string, string>> = {
     loggingIn: '登录中...',
     agreementPrefix: '已阅读并同意',
     agreementLink: '《用户协议》',
+    agreementAnd: '和',
+    privacyLink: '《隐私协议》',
     moreMethods: '更多登录方式',
     kdcloudLogin: '金蝶云账号登录',
     kdcloudLoggingIn: '金蝶云登录中...',
@@ -70,6 +73,8 @@ const i18n: Record<Lang, Record<string, string>> = {
     loggingIn: 'Signing in...',
     agreementPrefix: 'I have read and agree to the ',
     agreementLink: 'User Agreement',
+    agreementAnd: ' and ',
+    privacyLink: 'Privacy Policy',
     moreMethods: 'More sign-in methods',
     kdcloudLogin: 'Kingdee Cloud Account',
     kdcloudLoggingIn: 'Signing in via Kingdee Cloud...',
@@ -241,21 +246,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       <div className="login-video-overlay" />
 
       {/* 敬请期待提示 */}
-      {showComingSoon && (
-        <div className="login-coming-soon-toast">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <g clipPath="url(#clip0_coming_soon)">
-              <path d="M10.0007 0.833984C15.0633 0.833984 19.1673 4.93804 19.1673 10.0007C19.1673 15.0633 15.0633 19.1673 10.0007 19.1673C4.93804 19.1673 0.833984 15.0633 0.833984 10.0007C0.833984 4.93804 4.93804 0.833984 10.0007 0.833984ZM10.0007 2.50065C5.85852 2.50065 2.50065 5.85852 2.50065 10.0007C2.50065 14.1428 5.85852 17.5007 10.0007 17.5007C14.1428 17.5007 17.5007 14.1428 17.5007 10.0007C17.5007 5.85852 14.1428 2.50065 10.0007 2.50065ZM10.0007 9.0835C10.4607 9.0835 10.8337 9.45681 10.834 9.91683V14.1673C10.834 14.6276 10.4609 15.0007 10.0007 15.0007C9.54041 15.0007 9.16732 14.6276 9.16732 14.1673V9.91683C9.16758 9.45681 9.54058 9.0835 10.0007 9.0835ZM10.0007 5.83398C10.5529 5.83399 11.0008 6.28187 11.0008 6.83415C11.0007 7.38635 10.5529 7.8343 10.0007 7.83431C9.44842 7.83431 9.00058 7.38635 9.00049 6.83415C9.00049 6.28186 9.44837 5.83398 10.0007 5.83398Z" fill="#2970FF"/>
-            </g>
-            <defs>
-              <clipPath id="clip0_coming_soon">
-                <rect width="20" height="20" fill="white"/>
-              </clipPath>
-            </defs>
-          </svg>
-          <span className="login-coming-soon-text">{t.comingSoon}</span>
-        </div>
-      )}
+      <TopToast visible={showComingSoon} type="info" message={t.comingSoon} />
 
       {/* 语言切换 */}
       <div className="login-lang-switcher">
@@ -368,11 +359,15 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </button>
 
           {/* 用户协议 */}
-          <label className="login-agreement">
+          <label className="login-agreement" title={`${t.agreementPrefix}${t.agreementLink}${t.agreementAnd}${t.privacyLink}`}>
             <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
             <span>{t.agreementPrefix}</span>
             <a className="login-agreement-link" href="#agreement" onClick={(e) => { e.preventDefault(); handleComingSoon() }}>
               {t.agreementLink}
+            </a>
+            <span>{t.agreementAnd}</span>
+            <a className="login-agreement-link" href="#privacy" onClick={(e) => { e.preventDefault(); handleComingSoon() }}>
+              {t.privacyLink}
             </a>
           </label>
 
@@ -382,6 +377,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </div>
 
           {/* 金蝶云账号登录 */}
+          {/* OAuth2 错误提示（固定占位） */}
+          <div className="login-error-msg" style={{ visibility: oauthError ? 'visible' : 'hidden' }}>
+            <svg className="login-error-icon" viewBox="0 0 16 16" fill="#ef4444">
+              <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm-.75 4a.75.75 0 011.5 0v3.5a.75.75 0 01-1.5 0V5zm.75 7a1 1 0 110-2 1 1 0 010 2z" />
+            </svg>
+            <span className="login-error-text" title={oauthError || ''}>{oauthError || '\u00A0'}</span>
+          </div>
           <button type="button" className="login-kdcloud-btn" onClick={handleKdcloudLogin} disabled={loading || oauthLoading}>
             <svg className="login-kdcloud-svg" xmlns="http://www.w3.org/2000/svg" width="14" height="20" viewBox="0 0 14 20" fill="none">
               <path fillRule="evenodd" clipRule="evenodd" d="M4.01052 8.23615C4.01052 9.34548 3.11271 10.2448 2.00532 10.2448C0.897811 10.2448 0 9.34548 0 8.23615C0 7.12682 0.897811 6.22754 2.00532 6.22754C3.11271 6.22754 4.01052 7.12682 4.01052 8.23615Z" fill="#46CBFF"/>
@@ -391,14 +393,6 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             </svg>
             {oauthLoading ? t.kdcloudLoggingIn : t.kdcloudLogin}
           </button>
-
-          {/* OAuth2 错误提示（固定占位） */}
-          <div className="login-error-msg" style={{ marginTop: 8, visibility: oauthError ? 'visible' : 'hidden' }}>
-            <svg className="login-error-icon" viewBox="0 0 16 16" fill="#ef4444">
-              <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm-.75 4a.75.75 0 011.5 0v3.5a.75.75 0 01-1.5 0V5zm.75 7a1 1 0 110-2 1 1 0 010 2z" />
-            </svg>
-            <span className="login-error-text" title={oauthError || ''}>{oauthError || '\u00A0'}</span>
-          </div>
         </form>
       </div>
     </div>

@@ -1,0 +1,60 @@
+/* ===== 通用顶部 Toast 提示 ===== */
+
+.top-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: inline-flex;
+  height: 40px;
+  padding: 0 12px;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  border-radius: 16px;
+  box-shadow: 0 6px 12px 0 rgba(0, 0, 0, 0.04);
+  animation: top-toast-fade-in 0.25s ease-out;
+  -webkit-app-region: no-drag;
+}
+
+/* 信息类型（蓝色） */
+.top-toast--info {
+  border: 1px solid var(--primary-200, #BCD8FF);
+  background: var(--primary-50, #EEF5FF);
+}
+
+/* 成功类型（绿色） */
+.top-toast--success {
+  border: 1px solid var(--success-200, #B4F5BF);
+  background: var(--success-50, #EEFFF0);
+}
+
+/* 错误类型（红色） */
+.top-toast--error {
+  border: 1px solid var(--danger-100, #FFE0E3);
+  background: var(--danger-50, #FFF0F1);
+}
+
+.top-toast svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  aspect-ratio: 1/1;
+}
+
+.top-toast-text {
+  color: #2F2F2F;
+  text-align: center;
+  font-family: "PingFang SC", sans-serif;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+@keyframes top-toast-fade-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

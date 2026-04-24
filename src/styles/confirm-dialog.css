@@ -1,0 +1,90 @@
+/* ===== 通用确认弹窗 ===== */
+.confirm-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 2000;
+  -webkit-app-region: no-drag;
+  backdrop-filter: blur(2px);
+}
+
+.confirm-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2001;
+  display: flex;
+  width: 320px;
+  padding: 20px;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: 24px;
+  background: var(--Color-Bg-Surface, #FFF);
+  box-shadow: 0 6px 12px 0 rgba(0, 0, 0, 0.08);
+  animation: confirm-dialog-fade-in 0.2s ease-out;
+}
+
+@keyframes confirm-dialog-fade-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.confirm-dialog-title {
+  color: var(--black-82, rgba(0, 0, 0, 0.82));
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.confirm-dialog-message {
+  color: var(--black-46, rgba(0, 0, 0, 0.46));
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  margin-top: 8px;
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.confirm-dialog-btn {
+  display: flex;
+  padding: var(--Space-x3, 6px) var(--Space-x6, 12px);
+  align-items: center;
+  gap: var(--Space-x4, 8px);
+  border-radius: var(--Radius-Control, 8px);
+  border: none;
+  cursor: pointer;
+  font-style: normal;
+  line-height: var(--line-height-3, 22px);
+  transition: opacity 0.15s;
+}
+
+.confirm-dialog-btn:hover {
+  opacity: 0.85;
+}
+
+.confirm-dialog-btn--cancel {
+  background: var(--Color-Bg-Base, #FFF);
+  color: var(--black-64, rgba(0, 0, 0, 0.64));
+  font-size: var(--size-3, 14px);
+  font-weight: 400;
+}
+
+.confirm-dialog-btn--ok {
+  background: var(--primary-600, #2970FF);
+  color: var(--Color-Text-On-Inverse, #FFF);
+  font-size: var(--font-size-small, 14px);
+  font-weight: 600;
+}

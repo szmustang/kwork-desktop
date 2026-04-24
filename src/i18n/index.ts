@@ -26,6 +26,14 @@ const messages = {
     langZh: '简体中文',
     langEn: 'English',
     logout: '退出登录',
+    // confirm dialog
+    logoutTitle: '退出登录',
+    logoutMessage: '请确认是否退出登录',
+    confirmOk: '确定',
+    confirmCancel: '取消',
+    // logout toast
+    logoutSuccess: '已退出登录。',
+    logoutError: '退出登录异常，请联系管理员。',
     // about dialog
     aboutWebsite: '官网',
     aboutTerms: '用户协议',
@@ -71,6 +79,14 @@ const messages = {
     langZh: '简体中文',
     langEn: 'English',
     logout: 'Log Out',
+    // confirm dialog
+    logoutTitle: 'Log Out',
+    logoutMessage: 'Are you sure you want to log out?',
+    confirmOk: 'OK',
+    confirmCancel: 'Cancel',
+    // logout toast
+    logoutSuccess: 'Successfully logged out.',
+    logoutError: 'Logout failed, please contact admin.',
     // about dialog
     aboutWebsite: 'Website',
     aboutTerms: 'Terms of Service',

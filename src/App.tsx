@@ -6,8 +6,10 @@ import WorkTab from './components/WorkTab'
 import DevTab from './components/DevTab'
 import { useOpenCodeSetup } from './components/dev/OpenCodeSetup'
 import { fetchUserProfile } from './services/user-api'
+import { logout } from './services/auth-api'
 import { t, type Lang } from './i18n'
 import AboutDialog from './components/AboutDialog'
+import TopToast, { type ToastType } from './components/TopToast'
 import './App.css'
 
 // 错误边界：防止子组件崩溃导致整个页面白屏
@@ -307,10 +309,38 @@ function App() {
     fetchAndMergeProfile(userInfo)
   }, [fetchAndMergeProfile])
 
-  const handleLogout = useCallback(() => {
+  // ── 登出 Toast 状态 ──
+  const [logoutToast, setLogoutToast] = useState<{ type: ToastType; message: string } | null>(null)
+  const logoutToastTimer = useRef<ReturnType<typeof setTimeout>>()
+
+  const showLogoutToast = useCallback((type: ToastType, message: string) => {
+    if (logoutToastTimer.current) clearTimeout(logoutToastTimer.current)
+    setLogoutToast({ type, message })
+    logoutToastTimer.current = setTimeout(() => setLogoutToast(null), 3000)
+  }, [])
+
+  useEffect(() => {
+    return () => { if (logoutToastTimer.current) clearTimeout(logoutToastTimer.current) }
+  }, [])
+
+  // 用 ref 追踪最新的 user/lang，避免 handleLogout 依赖它们导致频繁重建
+  const userRef = useRef(user)
+  userRef.current = user
+  const langRef = useRef(lang)
+  langRef.current = lang
+
+  const handleLogout = useCallback(async () => {
+    const token = userRef.current?.token
+    // 立即清除本地登录态
     localStorage.removeItem('lingee-user')
     setUser(null)
-  }, [])
+    try {
+      if (token) await logout(token)
+      showLogoutToast('success', t(langRef.current, 'logoutSuccess'))
+    } catch {
+      showLogoutToast('error', t(langRef.current, 'logoutError'))
+    }
+  }, [showLogoutToast])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -387,6 +417,7 @@ function App() {
       <>
         <LoginPage onLogin={handleLogin} />
         <AboutDialog visible={triggerAbout} onClose={() => setTriggerAbout(false)} appVersion={appVersion} appName={appName} lang={lang} />
+        <TopToast visible={!!logoutToast} type={logoutToast?.type} message={logoutToast?.message ?? ''} />
       </>
     )
   }
@@ -434,6 +465,7 @@ function App() {
 
       {/* 右下角更新提示 */}
       <UpdateToast lang={lang} />
+      <TopToast visible={!!logoutToast} type={logoutToast?.type} message={logoutToast?.message ?? ''} />
     </div>
   )
 }

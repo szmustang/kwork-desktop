@@ -10,6 +10,7 @@
   position: relative;
   overflow: hidden;
   -webkit-app-region: drag;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
 }
 
 /* 视频背景 */
@@ -162,7 +163,7 @@
   box-shadow: 0 6px 24px 0 rgba(0, 0, 0, 0.06);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  padding: 40px 36px 8px;
+  padding: 40px 20px 20px;
   position: relative;
   -webkit-app-region: no-drag;
   z-index: 5;
@@ -171,10 +172,11 @@
 /* 标题 */
 .login-title {
   text-align: center;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  color: #1f2328;
-  margin-bottom: 32px;
+  color: #000;
+  line-height: 28px;
+  margin-bottom: 40px;
 }
 
 /* 表单 */
@@ -194,11 +196,11 @@
   width: 100%;
   height: 48px;
   padding: 0 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 10px;
+  border: 1px solid var(--neutral-100, rgba(0, 0, 0, 0.06));
+  border-radius: 16px;
   font-size: 15px;
   color: #1f2328;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(250, 250, 250, 0.50);
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -213,7 +215,7 @@
 /* 密码输入框右侧区域 */
 .login-password-group {
   position: relative;
-  margin-bottom: 8px;
+  margin-bottom: 16px;
 }
 .login-password-group .login-input {
   padding-right: 150px;
@@ -266,8 +268,12 @@
 }
 
 .login-forgot-link {
-  font-size: 13px;
-  color: #666;
+  color: var(--black-46, rgba(0, 0, 0, 0.46));
+  text-align: right;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
   text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
@@ -292,7 +298,6 @@
   font-size: 13px;
   color: #ef4444;
   margin-top: -4px;
-  margin-bottom: 8px;
   padding-left: 2px;
   min-height: 20px;
   overflow: hidden;
@@ -317,13 +322,18 @@
   display: flex;
   justify-content: flex-end;
   margin-bottom: 16px;
-  font-size: 13px;
-  color: #999;
+  font-size: 12px;
+  color: var(--black-28, rgba(0, 0, 0, 0.28));
+  line-height: 18px;
 }
 
 .login-register-link {
-  color: #1f2328;
-  font-weight: 600;
+  color: var(--gray-900, #212121);
+  text-align: right;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 18px;
   text-decoration: none;
   cursor: pointer;
   margin-left: 4px;
@@ -337,8 +347,8 @@
   width: 100%;
   height: 48px;
   border: none;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #3b8bf5, #5ba3ff);
+  border-radius: 16px;
+  background: #288BFF;
   color: #fff;
   font-size: 16px;
   font-weight: 600;
@@ -361,25 +371,63 @@
 .login-agreement {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #999;
-  margin-bottom: 24px;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: 0;
+  color: #666;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 18px;
+  margin-bottom: 60px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
 }
 .login-agreement input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  accent-color: #1677ff;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  aspect-ratio: 1/1;
+  border-radius: 4px;
+  border: 1px solid var(--neutral-gray-300, #EBEEF2);
+  background: var(--neutral-gray-100, #F7F8FA);
   cursor: pointer;
+  margin: 0;
+  margin-right: 8px;
+  flex-shrink: 0;
+  position: relative;
+}
+.login-agreement input[type="checkbox"]:checked {
+  background: #1677ff;
+  border-color: #1677ff;
+}
+.login-agreement input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: translate(-50%, -60%) rotate(45deg);
 }
 .login-agreement-link {
-  color: #1677ff;
+  color: var(--blue-600, #1B55F5);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 18px;
   text-decoration: none;
   cursor: pointer;
+  flex-shrink: 0;
 }
 .login-agreement-link:hover {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 /* 分隔线 */
@@ -387,31 +435,36 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 20px;
 }
 .login-divider::before,
 .login-divider::after {
   content: '';
   flex: 1;
   height: 1px;
-  background: #e8e8e8;
+  background: var(--neutral-50, rgba(0, 0, 0, 0.03));
 }
 .login-divider-text {
-  font-size: 13px;
-  color: #bbb;
+  color: var(--46-black-999, var(--neutral-500, rgba(0, 0, 0, 0.46)));
+  text-align: center;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 18px;
   white-space: nowrap;
 }
 
 /* 金蝶云账号登录 */
 .login-kdcloud-btn {
   width: 100%;
-  height: 46px;
-  border: 1px solid #e0e0e0;
-  border-radius: 10px;
+  height: 48px;
+  border: 1px solid var(--neutral-200, rgba(0, 0, 0, 0.08));
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.8);
-  color: #1677ff;
+  color: var(--primary-600, #2970FF);
   font-size: 14px;
-  font-weight: 500;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -435,45 +488,3 @@
   flex-shrink: 0;
 }
 
-/* 敬请期待提示 Toast */
-.login-coming-soon-toast {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
-  display: inline-flex;
-  height: 40px;
-  padding: 0 12px;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  border-radius: 16px;
-  border: 1px solid var(--primary-200, #BCD8FF);
-  background: var(--primary-50, #EEF5FF);
-  box-shadow: 0 6px 12px 0 rgba(0, 0, 0, 0.04);
-  animation: login-coming-soon-fade-in 0.25s ease-out;
-  -webkit-app-region: no-drag;
-}
-
-.login-coming-soon-toast svg {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
-.login-coming-soon-text {
-  color: #2F2F2F;
-  text-align: center;
-  font-family: "PingFang SC", sans-serif;
-  font-size: 16px;
-  font-style: normal;
-  font-weight: 400;
-  line-height: 24px;
-  white-space: nowrap;
-}
-
-@keyframes login-coming-soon-fade-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
