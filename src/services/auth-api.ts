@@ -45,6 +45,25 @@ export class AuthError extends Error {
 /** 认证 API 基础 URL */
 const AUTH_BASE_URL = LINGEE_BASE_URL
 
+// ===== DEV ONLY: 模拟登录账号（后端接口不稳定时使用，正式上线前删除） =====
+const MOCK_ACCOUNT = '17299999999'
+const MOCK_PASSWORD = '123456'
+
+function createMockLoginResponse(): LoginResponse {
+  return {
+    ok: true,
+    error_code: '0',
+    token: `mock-token-${Date.now()}`,
+    tenantId: 'mock-tenant-001',
+    tenantAccountId: 'mock-tenant-account-001',
+    userId: 'mock-user-001',
+    role: 'admin',
+    displayName: '测试账号',
+    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7天后过期
+  }
+}
+// ===== END DEV ONLY =====
+
 /**
  * 调用 POST /auth/login 进行登录
  *
@@ -52,6 +71,12 @@ const AUTH_BASE_URL = LINGEE_BASE_URL
  * @throws {Error}     网络异常等非预期错误
  */
 export async function login(req: LoginRequest): Promise<LoginResponse> {
+  // DEV ONLY: 假账号直接返回模拟数据，正式上线前删除
+  if (req.username === MOCK_ACCOUNT && req.password === MOCK_PASSWORD) {
+    console.warn('[Auth] 使用模拟登录账号，正式上线前请删除此逻辑')
+    return createMockLoginResponse()
+  }
+
   const res = await fetch(`${AUTH_BASE_URL}/openwork/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
