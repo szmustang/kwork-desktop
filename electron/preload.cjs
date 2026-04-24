@@ -59,27 +59,10 @@ contextBridge.exposeInMainWorld('lingeeBridge', {
   },
 
   // ── 客户端自动更新 ──
-  checkForClientUpdate: () => ipcRenderer.invoke('check-for-client-update'),
-  downloadClientUpdate: () => ipcRenderer.invoke('download-client-update'),
   installClientUpdate: () => ipcRenderer.invoke('install-client-update'),
-  onClientUpdateAvailable: (cb) => {
-    const listener = (_, data) => cb(data);
-    ipcRenderer.on('client-update-available', listener);
-    return () => ipcRenderer.removeListener('client-update-available', listener);
-  },
-  onClientDownloadProgress: (cb) => {
-    const listener = (_, data) => cb(data);
-    ipcRenderer.on('client-download-progress', listener);
-    return () => ipcRenderer.removeListener('client-download-progress', listener);
-  },
   onClientUpdateDownloaded: (cb) => {
-    const listener = () => cb();
+    const listener = (_, data) => cb(data);
     ipcRenderer.on('client-update-downloaded', listener);
     return () => ipcRenderer.removeListener('client-update-downloaded', listener);
-  },
-  onClientUpdateError: (cb) => {
-    const listener = (_, error) => cb(error);
-    ipcRenderer.on('client-update-error', listener);
-    return () => ipcRenderer.removeListener('client-update-error', listener);
   },
 });

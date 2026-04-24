@@ -37,16 +37,8 @@ const tabKeys: TabKey[] = ['chat', 'work', 'dev']
 
 /* ── 右下角更新提示弹窗 ── */
 
-const CLIENT_CHECK_INTERVAL = 60 * 60 * 1000      // 客户端: 1 小时
-const CLIENT_CHECK_DELAY = 1 * 60 * 1000          // 客户端首次检测延迟: 1 分钟
-
 function UpdateToast({ lang }: { lang: Lang }) {
   const [updateInfo, setUpdateInfo] = useState<{ version: string; type: 'opencode' | 'client' } | null>(null)
-  const [downloading, setDownloading] = useState(false)
-  const [downloadProgress, setDownloadProgress] = useState(0)
-  const [downloadError, setDownloadError] = useState<string | null>(null)
-  const relaunchingRef = useRef(false)
-  const downloadingRef = useRef(false)
 
   // 监听主进程后台推送的 opencode 更新就绪事件（已预下载完成）
   useEffect(() => {
@@ -63,171 +55,60 @@ function UpdateToast({ lang }: { lang: Lang }) {
     return () => removeOpencodeReady?.()
   }, [updateInfo])
 
-  // 检查客户端更新
-  const checkClientUpdate = useCallback(async () => {
-    const api = (window as any).lingeeBridge
-    if (!api?.checkForClientUpdate) return
-
-    try {
-      const result = await api.checkForClientUpdate()
-      console.log('[UpdateToast] client check result:', JSON.stringify(result))
-    } catch (err) {
-      console.warn('[UpdateToast] client check failed:', err)
-    }
-  }, [])
-
+  // 监听客户端更新事件（后台静默下载完成后才通知）
   useEffect(() => {
-    // 监听客户端更新事件
     const api = (window as any).lingeeBridge
     if (!api) return
 
-    const removeAvailable = api.onClientUpdateAvailable?.((data: { version: string }) => {
-      console.log('[UpdateToast] Client update available:', data.version)
+    const removeDownloaded = api.onClientUpdateDownloaded?.((data: { version: string }) => {
+      console.log('[UpdateToast] Client update downloaded:', data?.version)
       if (!updateInfo) {
-        setUpdateInfo({ version: data.version, type: 'client' })
+        setUpdateInfo({ version: data?.version || 'unknown', type: 'client' })
       }
-    })
-
-    const removeProgress = api.onClientDownloadProgress?.((data: { percent: number }) => {
-      setDownloadProgress(data.percent)
-    })
-
-    const removeDownloaded = api.onClientUpdateDownloaded?.(() => {
-      console.log('[UpdateToast] Client update downloaded')
-      setDownloading(false)
-      downloadingRef.current = false
-      setDownloadProgress(100)
-      setDownloadError(null)
-      // 下载完成后不自动安装，等待用户点击「重启安装」按钮确认
-    })
-
-    const removeError = api.onClientUpdateError?.((error: string) => {
-      console.error('[UpdateToast] Update error:', error)
-      // 如果已经触发了 update-downloaded（正在重启），忽略后续 error
-      if (relaunchingRef.current) {
-        console.log('[UpdateToast] Ignoring error because relaunch is in progress')
-        return
-      }
-      // 下载过程中的错误：不清除弹窗，显示错误状态让用户可以重试
-      if (downloadingRef.current) {
-        console.log('[UpdateToast] Download error, showing retry state')
-        setDownloading(false)
-        downloadingRef.current = false
-        setDownloadError(error)
-        return
-      }
-      setDownloading(false)
-      setUpdateInfo(null)
     })
 
     return () => {
-      removeAvailable?.()
-      removeProgress?.()
       removeDownloaded?.()
-      removeError?.()
     }
   }, [updateInfo])
-
-  useEffect(() => {
-    // 客户端: 1 分钟后首次检查，之后每 1 小时
-    const clientTimer = setTimeout(checkClientUpdate, CLIENT_CHECK_DELAY)
-    const clientInterval = setInterval(checkClientUpdate, CLIENT_CHECK_INTERVAL)
-    
-    return () => {
-      clearTimeout(clientTimer)
-      clearInterval(clientInterval)
-    }
-  }, [checkClientUpdate])
 
   const handleUpdate = () => {
     const api = (window as any).lingeeBridge
     if (!api) return
     
-    // 根据更新类型执行不同操作
+    // 两种更新类型都是已下载完成状态，点击即重启安装
     if (updateInfo?.type === 'opencode') {
       // opencode 更新：重启应用即可（启动时会自动应用 pending.json）
       api.relaunchApp()
     } else if (updateInfo?.type === 'client') {
-      // 已下载完成：用户确认后执行安装重启
-      if (downloadProgress >= 100) {
-        relaunchingRef.current = true
-        api.installClientUpdate()
-        return
-      }
-      // 客户端更新：下载安装包
-      if (downloading) return // 防止重复点击
-      
-      setDownloading(true)
-      downloadingRef.current = true
-      setDownloadProgress(0)
-      setDownloadError(null)
-      
-      api.downloadClientUpdate().then((result: any) => {
-        if (result.success) {
-          console.log('[UpdateToast] Download started')
-        } else {
-          console.error('[UpdateToast] Download failed:', result.error)
-          setDownloading(false)
-          downloadingRef.current = false
-          setDownloadError(result.error)
-        }
-      }).catch((err: any) => {
-        console.error('[UpdateToast] Download error:', err)
-        setDownloading(false)
-        downloadingRef.current = false
-        setDownloadError(String(err))
-      })
+      // 客户端更新：已下载完成，直接安装重启
+      api.installClientUpdate()
     }
-  }
-
-  const handleDismiss = () => {
-    // 只关闭弹窗，不清除状态，30 分钟后检查时会自动再次弹出
-    setUpdateInfo(null)
   }
 
   if (!updateInfo) return null
 
   const isOpencode = updateInfo.type === 'opencode'
-  const isClientDownloaded = updateInfo.type === 'client' && downloadProgress >= 100
 
   return (
     <div className="update-toast">
-      <div className="update-toast-content">
-        <div className="update-toast-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none">
-            <path d="M35.6014 6.08816e-06C36.38 6.08816e-06 37.159 0.000190868 37.9382 0.00456336C38.5943 0.00839055 39.2502 0.0166947 39.9058 0.0341856C41.3347 0.0730136 42.7771 0.156412 44.1907 0.410161C45.6246 0.667741 46.9589 1.08895 48.2615 1.75228C49.5417 2.40414 50.7141 3.25528 51.7296 4.27131C52.7451 5.28736 53.5968 6.45924 54.2486 7.7394C54.9114 9.04198 55.3321 10.3764 55.5896 11.8102C55.8439 13.2232 55.9279 14.6646 55.9667 16.094C55.9848 16.7496 55.9925 17.406 55.9964 18.0616C56.0013 18.8402 55.9998 19.6192 55.9998 20.3984V35.6014C55.9998 36.38 56.0007 37.159 55.9964 37.9382C55.9925 38.5943 55.9842 39.2502 55.9667 39.9058C55.9279 41.3348 55.8434 42.7771 55.5896 44.1908C55.332 45.6245 54.9119 46.959 54.2486 48.2615C53.5968 49.5417 52.7457 50.7141 51.7296 51.7296C50.7135 52.7451 49.5417 53.5968 48.2615 54.2487C46.959 54.9114 45.6245 55.332 44.1907 55.5896C42.7776 55.8439 41.3353 55.9279 39.9058 55.9667C39.2502 55.9848 38.5937 55.9925 37.9382 55.9964C37.1596 56.0013 36.3806 55.9998 35.6014 55.9998H20.3984C19.6197 55.9998 18.8408 56.0007 18.0616 55.9964C17.4055 55.9925 16.7496 55.9842 16.094 55.9667C14.6651 55.9279 13.2237 55.8434 11.8102 55.5896C10.3764 55.3321 9.04198 54.9119 7.7394 54.2487C6.45924 53.5968 5.28681 52.7456 4.27131 51.7296C3.25582 50.7136 2.40414 49.5417 1.75228 48.2615C1.0895 46.9589 0.667741 45.6246 0.410161 44.1908C0.155865 42.7776 0.0730135 41.3353 0.0341855 39.9058C0.0161483 39.2502 0.0083904 38.5937 0.00456321 37.9382C-0.000355632 37.1596 5.93989e-06 36.3806 5.93989e-06 35.6014V20.3984C5.94002e-06 19.6197 0.000188973 18.8408 0.00456321 18.0616C0.008392 17.4055 0.0166887 16.7496 0.0341855 16.094C0.0730161 14.6652 0.156448 13.2237 0.410161 11.8102C0.667734 10.3763 1.08894 9.04203 1.75228 7.7394C2.40415 6.45917 3.25522 5.28685 4.27131 4.27131C5.2874 3.25577 6.45917 2.40415 7.7394 1.75228C9.04203 1.08949 10.3763 0.667734 11.8102 0.410161C13.2232 0.155901 14.6646 0.0730162 16.094 0.0341856C16.7496 0.016142 17.406 0.00839196 18.0616 0.00456336C18.8402 -0.00035766 19.6192 5.90303e-06 20.3984 6.08816e-06H35.6014Z" fill="#EEF5FF"/>
-            <g transform="translate(14,14)">
-              <path d="M24.4999 16.3335C25.1443 16.3335 25.6666 16.8558 25.6666 17.5002V21.0002C25.6666 23.5775 23.5772 25.6668 20.9999 25.6668H6.99992C4.42259 25.6668 2.33325 23.5775 2.33325 21.0002V17.5002C2.33325 16.8558 2.85559 16.3335 3.49992 16.3335C4.14425 16.3335 4.66658 16.8558 4.66659 17.5002V21.0002C4.66659 22.2888 5.71125 23.3335 6.99992 23.3335H20.9999C22.2886 23.3335 23.3333 22.2888 23.3333 21.0002V17.5002C23.3333 16.8558 23.8556 16.3335 24.4999 16.3335Z" fill="#2363FA"/>
-              <path d="M14.0181 2.3335C14.6623 2.33442 15.1843 2.85719 15.1837 3.5013L15.1689 15.4824L18.4752 12.5452C18.9568 12.1172 19.6934 12.1605 20.1215 12.6421C20.5494 13.1237 20.5062 13.8604 20.0247 14.2884L15.7055 18.1291C14.7331 18.9933 13.2668 18.9933 12.2944 18.1291L7.97518 14.2884C7.49368 13.8604 7.4505 13.1237 7.87834 12.6421C8.30641 12.1605 9.04308 12.1172 9.52466 12.5452L12.8355 15.487L12.8503 3.49902C12.8511 2.85478 13.3739 2.33286 14.0181 2.3335Z" fill="#2363FA"/>
-            </g>
-          </svg>
-        </div>
-        <div className="update-toast-text">
-          <strong>{t(lang, 'updateNewVersion')} {isOpencode ? t(lang, 'updateBuild') : t(lang, 'updateClient')} {updateInfo.version}</strong>
-          {downloading ? (
-            <div className="update-toast-progress">
-              <div className="update-toast-progress-bar">
-                <div className="update-toast-progress-fill" style={{ width: `${downloadProgress}%` }} />
-              </div>
-              <span className="update-toast-percent">{downloadProgress}%</span>
-            </div>
-          ) : downloadError ? (
-            <p style={{ color: '#e5534b' }}>{t(lang, 'updateDownloadFailed')}</p>
-          ) : isClientDownloaded ? (
-            <p>{t(lang, 'updateDownloaded')}</p>
-          ) : (
-            <p>{isOpencode ? 'Kingdee Code' : 'Kingdee Lingee'} {t(lang, 'updateAvailable')}</p>
-          )}
-        </div>
+      <div className="update-toast-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <path d="M24 4C23.2 4.8 16 12.4 16 20C16 24.4 19.6 28 24 28C28.4 28 32 24.4 32 20C32 12.4 24.8 4.8 24 4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+          <path d="M24 28V44" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          <path d="M18 36H30" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          <path d="M20 40H28" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
       </div>
-      {!downloading && (
-        <div className="update-toast-actions">
-          <button className="update-toast-btn" onClick={handleDismiss}>{t(lang, 'updateLater')}</button>
-          <button className="update-toast-btn primary" onClick={handleUpdate}>
-            {isClientDownloaded ? t(lang, 'updateRestart') : t(lang, 'updateNow')}
-          </button>
-        </div>
-      )}
+      <div className="update-toast-text">
+        <strong>{t(lang, 'updateUpdatedTo')} {updateInfo.version}</strong>
+        <p>{t(lang, 'updateRelaunchHint')}</p>
+      </div>
+      <div className="update-toast-actions">
+        <button className="update-toast-btn" onClick={handleUpdate}>
+          {t(lang, 'updateRelaunch')}
+        </button>
+      </div>
     </div>
   )
 }

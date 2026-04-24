@@ -19,6 +19,9 @@ const messages = {
     updateNow: '立即更新',
     updateRestart: '重启安装',
     updateLater: '稍后再说',
+    updateUpdatedTo: '已更新至',
+    updateRelaunchHint: '重启以应用更新',
+    updateRelaunch: '重启',
     // user dropdown
     fileTitle: '文件',
     notifyTitle: '通知',
@@ -72,6 +75,9 @@ const messages = {
     updateNow: 'Update Now',
     updateRestart: 'Restart to Install',
     updateLater: 'Later',
+    updateUpdatedTo: 'Updated to',
+    updateRelaunchHint: 'Relaunch to apply',
+    updateRelaunch: 'Relaunch',
     // user dropdown
     fileTitle: 'Files',
     notifyTitle: 'Notifications',

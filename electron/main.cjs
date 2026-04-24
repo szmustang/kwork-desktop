@@ -388,44 +388,6 @@ ipcMain.handle('lingeeBridge:notify', (_event, eventName, data) => {
   return { ok: KNOWN_BRIDGE_EVENTS.has(eventName) };
 });
 
-// Client auto-update IPC handlers
-ipcMain.handle('check-for-client-update', async () => {
-  try {
-    await autoUpdater.checkForUpdates();
-    return { success: true };
-  } catch (err) {
-    console.error('[AutoUpdater] Check failed:', err);
-    return { success: false, error: err.message };
-  }
-});
-
-ipcMain.handle('download-client-update', async () => {
-  try {
-    // Windows: 清理旧的 updater 缓存，避免使用过期/损坏的文件
-    if (process.platform === 'win32') {
-      try {
-        const cacheDir = path.join(app.getPath('userData'), '..', 'kingdee-kwork-updater', 'pending');
-        if (fs.existsSync(cacheDir)) {
-          const oldFiles = fs.readdirSync(cacheDir);
-          for (const f of oldFiles) {
-            try {
-              fs.unlinkSync(path.join(cacheDir, f));
-            } catch (_) { /* ignore */ }
-          }
-          console.log('[AutoUpdater] Cleared', oldFiles.length, 'cached files from', cacheDir);
-        }
-      } catch (err) {
-        console.warn('[AutoUpdater] Failed to clear cache:', err.message);
-      }
-    }
-    await autoUpdater.downloadUpdate();
-    return { success: true };
-  } catch (err) {
-    console.error('[AutoUpdater] Download failed:', err);
-    return { success: false, error: err.message };
-  }
-});
-
 ipcMain.handle('install-client-update', () => {
   killSidecar();
   // macOS: 必须先设置 forceQuit，否则 close 事件拦截会阻止退出，导致窗口仅被隐藏
@@ -524,7 +486,7 @@ autoUpdater.setFeedURL({
 // 开发模式下强制检查更新（仅用于测试）
 autoUpdater.forceDevUpdateConfig = true;
 
-// 禁用自动下载，我们手动控制
+// 禁用自动下载，由 update-available 事件手动触发静默下载
 autoUpdater.autoDownload = false;
 
 // 禁用退出时自动安装，由用户确认后手动触发
@@ -536,13 +498,26 @@ autoUpdater.on('checking-for-update', () => {
 });
 
 autoUpdater.on('update-available', (info) => {
-  console.log('[AutoUpdater] Update available:', info.version);
-  if (mainWindow) {
-    mainWindow.webContents.send('client-update-available', {
-      version: info.version,
-      releaseNotes: info.releaseNotes
-    });
+  console.log('[AutoUpdater] Update available:', info.version, '— starting silent background download');
+  // 不通知前端，静默后台下载；下载完成后由 update-downloaded 事件通知
+  // Windows: 清理旧的 updater 缓存，避免使用过期/损坏的文件
+  if (process.platform === 'win32') {
+    try {
+      const cacheDir = path.join(app.getPath('userData'), '..', 'kingdee-kwork-updater', 'pending');
+      if (fs.existsSync(cacheDir)) {
+        const oldFiles = fs.readdirSync(cacheDir);
+        for (const f of oldFiles) {
+          try { fs.unlinkSync(path.join(cacheDir, f)); } catch (_) { /* ignore */ }
+        }
+        console.log('[AutoUpdater] Cleared', oldFiles.length, 'cached files from', cacheDir);
+      }
+    } catch (err) {
+      console.warn('[AutoUpdater] Failed to clear cache:', err.message);
+    }
   }
+  autoUpdater.downloadUpdate().catch((err) => {
+    console.error('[AutoUpdater] Silent download failed:', err.message);
+  });
 });
 
 autoUpdater.on('update-not-available', () => {
@@ -551,23 +526,14 @@ autoUpdater.on('update-not-available', () => {
 
 autoUpdater.on('error', (err) => {
   console.error('[AutoUpdater] Error:', err.message);
-  if (mainWindow) {
-    mainWindow.webContents.send('client-update-error', err.message);
-  }
+  // 后台静默下载模式下，错误仅记录日志，不通知前端；下一轮定时检查会重试
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
   const percent = Math.round(progressObj.percent);
   const speed = (progressObj.bytesPerSecond / 1024 / 1024).toFixed(2);
-  console.log(`[AutoUpdater] Download progress: ${percent}% (${speed} MB/s)`);
-  if (mainWindow) {
-    mainWindow.webContents.send('client-download-progress', {
-      percent,
-      speed,
-      transferred: progressObj.transferred,
-      total: progressObj.total
-    });
-  }
+  console.log(`[AutoUpdater] Background download progress: ${percent}% (${speed} MB/s)`);
+  // 后台静默下载，不发送进度到前端
 });
 
 autoUpdater.on('update-downloaded', (info) => {
@@ -599,8 +565,11 @@ autoUpdater.on('update-downloaded', (info) => {
       console.error('[AutoUpdater] Failed to scan cache dir:', err.message);
     }
   }
+  // 下载完成，通知前端显示更新提示（附带版本号）
   if (mainWindow) {
-    mainWindow.webContents.send('client-update-downloaded');
+    mainWindow.webContents.send('client-update-downloaded', {
+      version: info.version
+    });
   }
 });
 
@@ -662,6 +631,36 @@ function stopOpencodeBackgroundCheck() {
   if (bgCheckInterval) { clearInterval(bgCheckInterval); bgCheckInterval = null; }
 }
 
+/* ── Client Background Update Timer ── */
+const CLIENT_BG_CHECK_DELAY = 1 * 60 * 1000;      // 首次延迟 1 分钟
+const CLIENT_BG_CHECK_INTERVAL = 60 * 60 * 1000;   // 之后每 1 小时
+let clientCheckTimer = null;
+let clientCheckInterval = null;
+
+function startClientBackgroundCheck() {
+  if (clientCheckTimer) return;
+  console.log('[Main] Scheduling client background update check: delay=' + CLIENT_BG_CHECK_DELAY + 'ms, interval=' + CLIENT_BG_CHECK_INTERVAL + 'ms');
+
+  const doCheck = async () => {
+    try {
+      console.log('[AutoUpdater] Background check triggered');
+      await autoUpdater.checkForUpdates();
+    } catch (err) {
+      console.error('[AutoUpdater] Background check failed:', err.message);
+    }
+  };
+
+  clientCheckTimer = setTimeout(() => {
+    doCheck();
+    clientCheckInterval = setInterval(doCheck, CLIENT_BG_CHECK_INTERVAL);
+  }, CLIENT_BG_CHECK_DELAY);
+}
+
+function stopClientBackgroundCheck() {
+  if (clientCheckTimer) { clearTimeout(clientCheckTimer); clientCheckTimer = null; }
+  if (clientCheckInterval) { clearInterval(clientCheckInterval); clientCheckInterval = null; }
+}
+
 app.whenReady().then(async () => {
   // Pre-resolve login-shell environment early (macOS GUI apps lack full PATH)
   resolveShellEnv().catch(() => {});
@@ -669,8 +668,9 @@ app.whenReady().then(async () => {
   // 初始化 bridge config 的 hostVersion
   currentBridgeConfig.hostVersion = app.getVersion();
 
-  // Start opencode background update checker
+  // Start background update checkers
   startOpencodeBackgroundCheck();
+  startClientBackgroundCheck();
 
   // 自定义菜单，使 macOS 菜单栏显示正确的应用名称（必须在 app ready 之后）
   const appName = '金蝶灵基';
@@ -755,6 +755,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   forceQuit = true;
   stopOpencodeBackgroundCheck();
+  stopClientBackgroundCheck();
   // 向所有 webview 发送停止信号，允许被嵌套端执行优雅退出
   broadcastToWebviews('lingeeBridge:stop-requested');
   killSidecar();
