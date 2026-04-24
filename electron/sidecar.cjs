@@ -18,13 +18,13 @@ const UPDATES_DIR = path.join(KCODE_DIR, 'updates');
 const UPDATE_PENDING_PATH = path.join(UPDATES_DIR, 'update-pending.json');
 const DOWNLOAD_DIR = path.join(UPDATES_DIR, 'download');
 const DOWNLOAD_META_PATH = path.join(DOWNLOAD_DIR, '.download-meta.json');
-const UPDATER_LOG_PATH = path.join(UPDATES_DIR, 'updater.log');
+const UPDATER_LOG_PATH = path.join(UPDATES_DIR, 'opencode-update.log');
 const CDN_BASE = 'http://app.cosmicstudio.cn/cosmicai/lingee/update/opencode';
 
 /* ── Updater Logger ── */
 
 /**
- * Append a timestamped log line to ~/.kcode/updates/updater.log.
+ * Append a timestamped log line to ~/.kcode/updates/opencode-update.log.
  * Also prints to console for dev convenience.
  * Log file is auto-rotated when exceeding 1MB.
  */

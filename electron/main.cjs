@@ -13,6 +13,34 @@ app.commandLine.appendSwitch('disable-features', 'WidgetLayering');
 app.commandLine.appendSwitch('disable-mac-app-state-restoration');
 
 let mainWindow = null;
+
+/* ── Client Update File Logger ── */
+const os = require('os');
+const CLIENT_UPDATE_LOG_DIR = path.join(os.homedir(), '.kcode', 'updates');
+const CLIENT_UPDATE_LOG_PATH = path.join(CLIENT_UPDATE_LOG_DIR, 'lingee-desktop-update.log');
+const CLIENT_UPDATE_LOG_MAX_SIZE = 1 * 1024 * 1024; // 1MB
+
+function clientUpdateLog(level, ...args) {
+  const ts = new Date().toLocaleString('zh-CN', { hour12: false });
+  const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+  const line = `[${ts}] [${level}] ${msg}\n`;
+  // Console
+  if (level === 'ERROR') console.error('[AutoUpdater]', ...args);
+  else console.log('[AutoUpdater]', ...args);
+  // File
+  try {
+    fs.mkdirSync(CLIENT_UPDATE_LOG_DIR, { recursive: true });
+    try {
+      const stat = fs.statSync(CLIENT_UPDATE_LOG_PATH);
+      if (stat.size > CLIENT_UPDATE_LOG_MAX_SIZE) {
+        const content = fs.readFileSync(CLIENT_UPDATE_LOG_PATH, 'utf-8');
+        const halfPoint = content.indexOf('\n', Math.floor(content.length / 2));
+        fs.writeFileSync(CLIENT_UPDATE_LOG_PATH, content.slice(halfPoint + 1), 'utf-8');
+      }
+    } catch (_) { /* file may not exist yet */ }
+    fs.appendFileSync(CLIENT_UPDATE_LOG_PATH, line, 'utf-8');
+  } catch (_) { /* best effort */ }
+}
 let forceQuit = false;
 let downloadedFilePath = null; // 保存下载的更新文件路径
 
@@ -393,7 +421,7 @@ ipcMain.handle('install-client-update', () => {
   // macOS: 必须先设置 forceQuit，否则 close 事件拦截会阻止退出，导致窗口仅被隐藏
   forceQuit = true;
 
-  console.log('[AutoUpdater] install-client-update called, platform:', process.platform, 'downloadedFilePath:', downloadedFilePath);
+  clientUpdateLog('INFO', 'install-client-update called, platform:', process.platform, 'downloadedFilePath:', downloadedFilePath);
   if (process.platform === 'win32' && downloadedFilePath && downloadedFilePath.endsWith('.zip')) {
     // Windows zip 更新：electron-updater 的 NsisUpdater 无法处理 zip（它只会运行 exe 安装器）
     // 需要手动解压 zip 并用脚本替换应用文件后重启
@@ -459,7 +487,7 @@ ipcMain.handle('install-client-update', () => {
 
     fs.writeFileSync(ps1Path, script, 'utf-8');
     fs.writeFileSync(vbsPath, vbsScript, 'utf-8');
-    console.log('[AutoUpdater] Windows zip update: wrote PS1 to', ps1Path, 'VBS to', vbsPath);
+    clientUpdateLog('INFO', 'Windows zip update: wrote PS1 to', ps1Path, 'VBS to', vbsPath);
 
     // 用 wscript.exe 启动 VBS，进程完全独立，app.exit() 后继续运行
     spawn('wscript.exe', [vbsPath], {
@@ -494,11 +522,11 @@ autoUpdater.autoInstallOnAppQuit = false;
 
 // 自动更新事件监听
 autoUpdater.on('checking-for-update', () => {
-  console.log('[AutoUpdater] Checking for update...');
+  clientUpdateLog('INFO', 'Checking for update...');
 });
 
 autoUpdater.on('update-available', (info) => {
-  console.log('[AutoUpdater] Update available:', info.version, '— starting silent background download');
+  clientUpdateLog('INFO', 'Update available:', info.version, '— starting silent background download');
   // 不通知前端，静默后台下载；下载完成后由 update-downloaded 事件通知
   // Windows: 清理旧的 updater 缓存，避免使用过期/损坏的文件
   if (process.platform === 'win32') {
@@ -509,48 +537,48 @@ autoUpdater.on('update-available', (info) => {
         for (const f of oldFiles) {
           try { fs.unlinkSync(path.join(cacheDir, f)); } catch (_) { /* ignore */ }
         }
-        console.log('[AutoUpdater] Cleared', oldFiles.length, 'cached files from', cacheDir);
+        clientUpdateLog('INFO', 'Cleared', oldFiles.length, 'cached files from', cacheDir);
       }
     } catch (err) {
-      console.warn('[AutoUpdater] Failed to clear cache:', err.message);
+      clientUpdateLog('WARN', 'Failed to clear cache:', err.message);
     }
   }
   autoUpdater.downloadUpdate().catch((err) => {
-    console.error('[AutoUpdater] Silent download failed:', err.message);
+    clientUpdateLog('ERROR', 'Silent download failed:', err.message);
   });
 });
 
 autoUpdater.on('update-not-available', () => {
-  console.log('[AutoUpdater] No update available');
+  clientUpdateLog('INFO', 'No update available');
 });
 
 autoUpdater.on('error', (err) => {
-  console.error('[AutoUpdater] Error:', err.message);
+  clientUpdateLog('ERROR', 'Error:', err.message);
   // 后台静默下载模式下，错误仅记录日志，不通知前端；下一轮定时检查会重试
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
   const percent = Math.round(progressObj.percent);
   const speed = (progressObj.bytesPerSecond / 1024 / 1024).toFixed(2);
-  console.log(`[AutoUpdater] Background download progress: ${percent}% (${speed} MB/s)`);
+  clientUpdateLog('INFO', `Download progress: ${percent}% (${speed} MB/s)`);
   // 后台静默下载，不发送进度到前端
 });
 
 autoUpdater.on('update-downloaded', (info) => {
-  console.log('[AutoUpdater] Update downloaded:', info.version);
-  console.log('[AutoUpdater] Event info keys:', Object.keys(info).join(', '));
+  clientUpdateLog('INFO', 'Update downloaded:', info.version);
+  clientUpdateLog('INFO', 'Event info keys:', Object.keys(info).join(', '));
   // 保存下载的文件路径，Windows zip 更新需要用到
   if (info.downloadedFile) {
     downloadedFilePath = info.downloadedFile;
-    console.log('[AutoUpdater] Downloaded file (from event):', downloadedFilePath);
+    clientUpdateLog('INFO', 'Downloaded file (from event):', downloadedFilePath);
   } else if (process.platform === 'win32') {
     // 回退：扫描 updater 缓存目录查找 zip 文件
     try {
       const cacheDir = path.join(app.getPath('userData'), '..', 'kingdee-kwork-updater', 'pending');
-      console.log('[AutoUpdater] Scanning cache dir:', cacheDir);
+      clientUpdateLog('INFO', 'Scanning cache dir:', cacheDir);
       if (fs.existsSync(cacheDir)) {
         const files = fs.readdirSync(cacheDir).filter(f => f.endsWith('.zip'));
-        console.log('[AutoUpdater] Found zip files:', files);
+        clientUpdateLog('INFO', 'Found zip files:', files);
         if (files.length > 0) {
           // 取最新的 zip 文件
           const sorted = files.map(f => ({
@@ -558,11 +586,11 @@ autoUpdater.on('update-downloaded', (info) => {
             time: fs.statSync(path.join(cacheDir, f)).mtimeMs
           })).sort((a, b) => b.time - a.time);
           downloadedFilePath = path.join(cacheDir, sorted[0].name);
-          console.log('[AutoUpdater] Downloaded file (from scan):', downloadedFilePath);
+          clientUpdateLog('INFO', 'Downloaded file (from scan):', downloadedFilePath);
         }
       }
     } catch (err) {
-      console.error('[AutoUpdater] Failed to scan cache dir:', err.message);
+      clientUpdateLog('ERROR', 'Failed to scan cache dir:', err.message);
     }
   }
   // 下载完成，通知前端显示更新提示（附带版本号）
@@ -643,10 +671,10 @@ function startClientBackgroundCheck() {
 
   const doCheck = async () => {
     try {
-      console.log('[AutoUpdater] Background check triggered');
+      clientUpdateLog('INFO', 'Background check triggered');
       await autoUpdater.checkForUpdates();
     } catch (err) {
-      console.error('[AutoUpdater] Background check failed:', err.message);
+      clientUpdateLog('ERROR', 'Background check failed:', err.message);
     }
   };
 
