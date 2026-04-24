@@ -183,6 +183,17 @@ ipcMain.handle('kill-sidecar', () => {
 
 // Opencode management IPC
 ipcMain.handle('check-opencode', async () => {
+  // Apply pending update first: if a pre-downloaded version exists,
+  // replace the binary BEFORE checking existence — avoids unnecessary CDN re-download.
+  try {
+    const { applyPendingUpdate } = require('./sidecar.cjs');
+    const updateResult = await applyPendingUpdate();
+    if (updateResult.applied) {
+      console.log('[Main] Applied pending update to v' + updateResult.version + ' before check');
+    }
+  } catch (err) {
+    console.warn('[Main] applyPendingUpdate before check failed:', err.message);
+  }
   return checkOpencodeInstalled();
 });
 

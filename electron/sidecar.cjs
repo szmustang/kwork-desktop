@@ -232,7 +232,8 @@ function downloadFile(url, destPath, onProgress) {
  * If the server does not support Range, restarts from scratch.
  * Returns the local file path.
  */
-function downloadFileResumable(url, destPath, onProgress, expectedSize) {
+function downloadFileResumable(url, destPath, onProgress, expectedSize, _attempt) {
+  if (!_attempt) _attempt = 0;
   return new Promise((resolve, reject) => {
     fs.mkdirSync(path.dirname(destPath), { recursive: true });
 
@@ -249,10 +250,34 @@ function downloadFileResumable(url, destPath, onProgress, expectedSize) {
       return resolve(destPath);
     }
 
+    const isResuming = existingSize > 0;
     const headers = {};
-    if (existingSize > 0) {
+    if (isResuming) {
       headers['Range'] = `bytes=${existingSize}-`;
       updaterLog('INFO', 'Resuming download from byte', existingSize);
+    }
+
+    // Helper: on failure, clean up and retry (up to 3 attempts total).
+    // If resuming, delete partial file + download-meta to start fresh.
+    // Only skip retry if server is completely unreachable.
+    function retryOrFail(err) {
+      const code = err.code || '';
+      const unreachable = ['ECONNREFUSED', 'ENOTFOUND', 'EHOSTUNREACH', 'ENETUNREACH'].includes(code);
+      if (unreachable) {
+        updaterLog('ERROR', 'Server unreachable (' + code + '), will retry next cycle');
+        reject(err);
+        return;
+      }
+      if (_attempt >= 2) {
+        updaterLog('ERROR', 'Download failed after 3 attempts (' + err.message + '), will retry next cycle');
+        reject(err);
+        return;
+      }
+      // Clean up partial file and download metadata before retry
+      try { fs.unlinkSync(destPath); } catch (_) {}
+      try { fs.unlinkSync(DOWNLOAD_META_PATH); } catch (_) {}
+      updaterLog('WARN', 'Download failed (' + err.message + '), attempt ' + (_attempt + 1) + '/3, retrying full download');
+      downloadFileResumable(url, destPath, onProgress, expectedSize, _attempt + 1).then(resolve, reject);
     }
 
     const client = url.startsWith('https') ? https : http;
@@ -260,17 +285,17 @@ function downloadFileResumable(url, destPath, onProgress, expectedSize) {
       // Follow redirect
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
-        return downloadFileResumable(res.headers.location, destPath, onProgress, expectedSize).then(resolve, reject);
+        return downloadFileResumable(res.headers.location, destPath, onProgress, expectedSize, _attempt).then(resolve, reject);
       }
 
       // 206 Partial Content = resume accepted
       // 200 OK = server doesn't support Range, restart from scratch
-      if (res.statusCode === 200 && existingSize > 0) {
+      if (res.statusCode === 200 && isResuming) {
         updaterLog('INFO', 'Server does not support Range, restarting download');
         existingSize = 0; // reset
       } else if (res.statusCode !== 200 && res.statusCode !== 206) {
         res.resume();
-        return reject(new Error(`HTTP ${res.statusCode} downloading ${url}`));
+        return retryOrFail(new Error(`HTTP ${res.statusCode} downloading ${url}`));
       }
 
       const contentLength = parseInt(res.headers['content-length'], 10) || 0;
@@ -293,19 +318,17 @@ function downloadFileResumable(url, destPath, onProgress, expectedSize) {
         });
       });
       file.on('error', (err) => {
-        // Don't delete partial file — it can be resumed next time
-        reject(err);
+        retryOrFail(err);
       });
     });
     req.on('error', (err) => {
-      // Don't delete partial file on network error — resume later
-      updaterLog('ERROR', 'Download network error:', err.message, '(partial file kept for resume)');
-      reject(err);
+      updaterLog('ERROR', 'Download network error:', err.message);
+      retryOrFail(err);
     });
     req.on('timeout', () => {
       req.destroy();
-      updaterLog('ERROR', 'Download timeout (partial file kept for resume)');
-      reject(new Error('Download timeout'));
+      updaterLog('ERROR', 'Download timeout');
+      retryOrFail(new Error('Download timeout'));
     });
   });
 }
@@ -744,7 +767,6 @@ async function applyPendingUpdate() {
     pending = JSON.parse(fs.readFileSync(UPDATE_PENDING_PATH, 'utf-8'));
   } catch (err) {
     updaterLog('ERROR', 'Bad update-pending.json:', err.message);
-    cleanupPendingUpdate();
     return { applied: false, error: 'parse_error' };
   }
 
@@ -755,7 +777,6 @@ async function applyPendingUpdate() {
   const currentVer = await getOpencodeVersion();
   if (currentVer && compareVersions(pendingVer, currentVer) <= 0) {
     updaterLog('INFO', 'Pending v' + pendingVer + ' <= local v' + currentVer + ', skipping');
-    cleanupPendingUpdate();
     return { applied: false, reason: 'not_newer' };
   }
   updaterLog('INFO', 'Applying update: local v' + (currentVer || 'unknown') + ' → v' + pendingVer);
@@ -763,7 +784,6 @@ async function applyPendingUpdate() {
   // 4. Verify archive exists
   if (!binary || !fs.existsSync(binary)) {
     updaterLog('ERROR', 'Archive not found:', binary);
-    cleanupPendingUpdate();
     return { applied: false, error: 'archive_missing' };
   }
 
@@ -772,7 +792,6 @@ async function applyPendingUpdate() {
     const computed = sha256File(binary);
     if (computed !== sha256.toLowerCase()) {
       updaterLog('ERROR', 'SHA256 mismatch! expected:', sha256, 'got:', computed);
-      cleanupPendingUpdate();
       return { applied: false, error: 'sha256_mismatch' };
     }
     updaterLog('INFO', 'SHA256 verification passed');
@@ -804,7 +823,6 @@ async function applyPendingUpdate() {
     if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
 
     updaterLog('INFO', 'Successfully updated opencode to v' + pendingVer);
-    cleanupPendingUpdate();
     try { fs.unlinkSync(backupPath); } catch (_) {}
     return { applied: true, version: pendingVer };
   } catch (err) {
@@ -819,27 +837,15 @@ async function applyPendingUpdate() {
     } catch (rbErr) {
       updaterLog('ERROR', 'Rollback failed:', rbErr.message);
     }
-    cleanupPendingUpdate();
     return { applied: false, error: 'extract_failed' };
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }
 
-/**
- * Clean up download directory after apply.
- * NOTE: update-pending.json is NEVER deleted — it can only be overwritten
- * after a successful download + SHA256 verification in backgroundUpdateCheck().
- */
-function cleanupPendingUpdate() {
-  const dlDir = path.join(UPDATES_DIR, 'download');
-  try {
-    if (fs.existsSync(dlDir)) fs.rmSync(dlDir, { recursive: true, force: true });
-    updaterLog('INFO', 'Cleaned up download directory');
-  } catch (err) {
-    updaterLog('ERROR', 'Failed to clean download dir:', err.message);
-  }
-}
+// NOTE: update-pending.json is NEVER deleted — it can only be overwritten
+// after a successful download + SHA256 verification in backgroundUpdateCheck().
+// download directory is also NEVER deleted — CDN flow naturally overwrites files.
 
 /**
  * Check if there's a pending update available (used internally by main.cjs).
