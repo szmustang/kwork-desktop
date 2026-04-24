@@ -427,13 +427,7 @@ async function _doInstallOpencode() {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
 
-    // 6. Cleanup download file
-    try {
-      fs.unlinkSync(localPath);
-      // Remove download dir if empty
-      const remaining = fs.readdirSync(DOWNLOAD_DIR);
-      if (remaining.length === 0) fs.rmdirSync(DOWNLOAD_DIR);
-    } catch (_) {}
+    // Download file and download dir are kept — CDN flow naturally overwrites them.
 
     installState.status = 'done';
     installState.error = null;
