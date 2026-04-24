@@ -108,6 +108,7 @@ function createWindow() {
     titleBarOverlay: isWin ? { color: '#00000000', symbolColor: '#666666', height: 40 } : undefined,
     trafficLightPosition: { x: 12, y: 12 },
     backgroundColor: '#ffffff',
+    show: false, // 延迟显示窗口，避免 Windows 下启动白屏闪烁
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -117,18 +118,21 @@ function createWindow() {
     },
   });
 
-  // 窗口创建后立即最大化（不使用 ready-to-show，避免 macOS 窗口状态恢复竞态）
-  mainWindow.maximize();
-
-  // 页面加载完成后聚焦窗口
-  mainWindow.webContents.once('did-finish-load', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.focus();
-      if (process.platform === 'darwin') {
-        app.focus({ steal: true });
-      }
+  // 页面加载完成后再显示并最大化窗口，避免启动白屏闪烁
+  let windowShown = false;
+  const showWindow = () => {
+    if (windowShown || !mainWindow || mainWindow.isDestroyed()) return;
+    windowShown = true;
+    mainWindow.maximize();
+    mainWindow.show();
+    mainWindow.focus();
+    if (process.platform === 'darwin') {
+      app.focus({ steal: true });
     }
-  });
+  };
+  mainWindow.webContents.once('did-finish-load', showWindow);
+  // 安全兜底：如果页面加载失败，超时后仍显示窗口，避免应用无响应
+  setTimeout(showWindow, 8000);
 
   // macOS: 点红色关闭按钮只隐藏窗口，不销毁，保留页面状态
   if (process.platform === 'darwin') {
