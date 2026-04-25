@@ -1,7 +1,6 @@
 const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog, shell, clipboard, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
 const { autoUpdater } = require('electron-updater');
 const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, checkOpencodeInstalled, backgroundUpdateCheck, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents, resolveShellEnv } = require('./sidecar.cjs');
 const { startOAuth2Login } = require('./oauth2.cjs');
@@ -43,7 +42,7 @@ function clientUpdateLog(level, ...args) {
   } catch (_) { /* best effort */ }
 }
 let forceQuit = false;
-let downloadedFilePath = null; // 保存下载的更新文件路径
+
 
 // ── LingeeBridge 配置状态 ──
 // 由渲染进程推送，主进程作为 webview 配置的单一数据源
@@ -422,85 +421,10 @@ ipcMain.handle('install-client-update', () => {
   // macOS: 必须先设置 forceQuit，否则 close 事件拦截会阻止退出，导致窗口仅被隐藏
   forceQuit = true;
 
-  clientUpdateLog('INFO', 'install-client-update called, platform:', process.platform, 'downloadedFilePath:', downloadedFilePath);
-  if (process.platform === 'win32' && downloadedFilePath && downloadedFilePath.endsWith('.zip')) {
-    // Windows zip 更新：electron-updater 的 NsisUpdater 无法处理 zip（它只会运行 exe 安装器）
-    // 需要手动解压 zip 并用脚本替换应用文件后重启
-    // Bug fix 1: 用 wscript.exe 启动脚本，避免 spawn detached 子进程随父进程退出被杀
-    // Bug fix 2: 脚本内自动检测写入权限，无权限时 UAC 提权
-    const appDir = path.dirname(process.execPath);
-    const ps1Path = path.join(app.getPath('temp'), 'lingee-update.ps1');
-    const vbsPath = path.join(app.getPath('temp'), 'lingee-update.vbs');
-    const logPath = path.join(app.getPath('temp'), 'lingee-update.log');
-    const script = [
-      `$logFile = '${logPath.replace(/'/g, "''")}';`,
-      `function Log($msg) { $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'; Add-Content -Path $logFile -Value "[$ts] $msg" }`,
-      `Log 'Update script started';`,
-      '',
-      '# Check write permission to app directory, elevate if needed',
-      `$dest = '${appDir.replace(/'/g, "''")}';`,
-      `$testFile = Join-Path $dest '.update-write-test';`,
-      `try { [IO.File]::WriteAllText($testFile, 'test'); Remove-Item $testFile -Force; Log 'Write permission OK' }`,
-      `catch {`,
-      `  Log 'No write permission, elevating with UAC...';`,
-      `  Start-Process powershell -ArgumentList '-ExecutionPolicy','Bypass','-File','${ps1Path.replace(/'/g, "''")}' -Verb RunAs;`,
-      `  exit 0`,
-      `}`,
-      '',
-      '# Wait for app to exit',
-      `Log 'Waiting 3 seconds for app to exit...';`,
-      `Start-Sleep -Seconds 3;`,
-      '',
-      '# Extract zip to temp dir',
-      `$zip = '${downloadedFilePath.replace(/'/g, "''")}';`,
-      `Log "Zip file: $zip";`,
-      `if (!(Test-Path $zip)) { Log 'ERROR: Zip file not found!'; exit 1 }`,
-      `$tmp = Join-Path $env:TEMP 'lingee-update-extract';`,
-      `if (Test-Path $tmp) { Remove-Item $tmp -Recurse -Force };`,
-      `try { Expand-Archive -Path $zip -DestinationPath $tmp -Force; Log 'Expand-Archive succeeded' } catch { Log "ERROR Expand-Archive: $_"; exit 1 }`,
-      '',
-      '# Determine source dir: if zip has a single wrapper folder (no loose files), use it; otherwise use extract root',
-      `$dirs = @(Get-ChildItem $tmp -Directory); $files = @(Get-ChildItem $tmp -File);`,
-      `if ($dirs.Count -eq 1 -and $files.Count -eq 0) { $src = $dirs[0].FullName; Log "Detected wrapper dir: $src" } else { $src = $tmp; Log "Flat zip layout, using extract root" };`,
-      `Log "Source dir: $src";`,
-      `Log "Items in source: $((Get-ChildItem $src).Count)";`,
-      '',
-      '# Copy all files to app directory, overwriting existing',
-      `Log "Destination dir: $dest";`,
-      `try { Copy-Item -Path (Join-Path $src '*') -Destination $dest -Recurse -Force; Log 'Copy succeeded' } catch { Log "ERROR Copy: $_"; exit 1 }`,
-      '',
-      '# Clean up',
-      `Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue;`,
-      `Log 'Cleanup done';`,
-      '',
-      '# Restart app as normal user (not elevated)',
-      `$appExe = Join-Path $dest '${path.basename(process.execPath)}';`,
-      `Log "Restarting: $appExe";`,
-      `Start-Process explorer.exe $appExe;`,
-      `Log 'Update complete';`,
-    ].join('\n');
-
-    // VBScript wrapper: 用 wscript 启动 PowerShell，进程独立于 Electron 进程树
-    const vbsScript = [
-      'Set objShell = CreateObject("WScript.Shell")',
-      `objShell.Run "powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File ""${ps1Path}""", 0, False`,
-    ].join('\r\n');
-
-    fs.writeFileSync(ps1Path, script, 'utf-8');
-    fs.writeFileSync(vbsPath, vbsScript, 'utf-8');
-    clientUpdateLog('INFO', 'Windows zip update: wrote PS1 to', ps1Path, 'VBS to', vbsPath);
-
-    // 用 wscript.exe 启动 VBS，进程完全独立，app.exit() 后继续运行
-    spawn('wscript.exe', [vbsPath], {
-      detached: true,
-      stdio: 'ignore',
-    }).unref();
-
-    app.exit(0);
-  } else {
-    // macOS: Squirrel 静默替换 .app；Windows exe: 启动 NSIS 安装程序
-    autoUpdater.quitAndInstall(false, true);
-  }
+  clientUpdateLog('INFO', 'install-client-update called, platform:', process.platform);
+  // macOS: Squirrel 静默替换 .app
+  // Windows: NSIS 静默安装（isSilent=true 无安装界面, isForceRunAfter=true 安装完自动重启）
+  autoUpdater.quitAndInstall(true, true);
 });
 
 // 设置应用名称
@@ -567,33 +491,6 @@ autoUpdater.on('download-progress', (progressObj) => {
 
 autoUpdater.on('update-downloaded', (info) => {
   clientUpdateLog('INFO', 'Update downloaded:', info.version);
-  clientUpdateLog('INFO', 'Event info keys:', Object.keys(info).join(', '));
-  // 保存下载的文件路径，Windows zip 更新需要用到
-  if (info.downloadedFile) {
-    downloadedFilePath = info.downloadedFile;
-    clientUpdateLog('INFO', 'Downloaded file (from event):', downloadedFilePath);
-  } else if (process.platform === 'win32') {
-    // 回退：扫描 updater 缓存目录查找 zip 文件
-    try {
-      const cacheDir = path.join(app.getPath('userData'), '..', 'kingdee-kwork-updater', 'pending');
-      clientUpdateLog('INFO', 'Scanning cache dir:', cacheDir);
-      if (fs.existsSync(cacheDir)) {
-        const files = fs.readdirSync(cacheDir).filter(f => f.endsWith('.zip'));
-        clientUpdateLog('INFO', 'Found zip files:', files);
-        if (files.length > 0) {
-          // 取最新的 zip 文件
-          const sorted = files.map(f => ({
-            name: f,
-            time: fs.statSync(path.join(cacheDir, f)).mtimeMs
-          })).sort((a, b) => b.time - a.time);
-          downloadedFilePath = path.join(cacheDir, sorted[0].name);
-          clientUpdateLog('INFO', 'Downloaded file (from scan):', downloadedFilePath);
-        }
-      }
-    } catch (err) {
-      clientUpdateLog('ERROR', 'Failed to scan cache dir:', err.message);
-    }
-  }
   // 下载完成，通知前端显示更新提示（附带版本号）
   if (mainWindow) {
     mainWindow.webContents.send('client-update-downloaded', {

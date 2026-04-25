@@ -2,7 +2,7 @@
   "name": "kingdee-lingee",
   "productName": "Kingdee Lingee",
   "private": true,
-  "version": "0.0.40",
+  "version": "0.0.41",
   "description": "Kingdee Lingee Desktop Client",
   "author": "Kingdee",
   "main": "electron/main.cjs",
@@ -65,8 +65,7 @@
     },
     "win": {
       "target": [
-        "nsis",
-        "zip"
+        "nsis"
       ],
       "icon": "build/icon.ico"
     },
@@ -77,9 +76,11 @@
       "category": "Development"
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
       "unicode": true,
-      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico"
