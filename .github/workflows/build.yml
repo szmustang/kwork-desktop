@@ -151,8 +151,8 @@ jobs:
           name: win
           path: |
             release/*.exe
-            release/*.zip
             release/*.yml
+            release/*.blockmap
           retention-days: 5
 
   # ── 创建 Release 并上传 ──
@@ -186,7 +186,7 @@ jobs:
       - name: Flatten artifacts (deduplicate, clean)
         run: |
           mkdir -p upload
-          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.yml' \) \
+          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.yml' -o -name '*.blockmap' \) \
             ! -name 'builder-debug.yml' | while read f; do
             bn=$(basename "$f")
             if [ ! -f "upload/$bn" ]; then
