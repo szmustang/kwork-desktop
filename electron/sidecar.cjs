@@ -494,6 +494,13 @@ async function _doInstallOpencode() {
       const destBin = path.join(binDir, exeName);
       fs.copyFileSync(extracted, destBin);
       if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
+      // Remove macOS quarantine attribute so Gatekeeper won't kill unsigned binary
+      if (process.platform === 'darwin') {
+        try {
+          require('child_process').execFileSync('xattr', ['-d', 'com.apple.quarantine', destBin]);
+          updaterLog('INFO', 'Removed quarantine attribute from', destBin);
+        } catch (_) { /* attribute may not exist, ignore */ }
+      }
       updaterLog('INFO', 'Installed opencode to', destBin);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -737,14 +744,30 @@ function getInstallState() {
 }
 
 function getOpencodeVersion() {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     if (!isOpencodeInstalled()) return resolve(null);
-    const child = execFile(getOpencodeBinPath(), ['--version'], { timeout: 5000 }, (err, stdout) => {
+    const binPath = getOpencodeBinPath();
+    // Use resolved shell environment (same as startSidecar) to ensure
+    // opencode can find any runtime dependencies via PATH
+    let env;
+    try {
+      env = await resolveShellEnv();
+    } catch (_) {
+      env = process.env;
+    }
+    let stderr = '';
+    const child = execFile(binPath, ['--version'], { timeout: 5000, env }, (err, stdout) => {
       childPids.delete(child.pid);
-      if (err) return resolve(null);
-      resolve(stdout.trim());
+      if (err) {
+        updaterLog('WARN', 'opencode --version failed:', err.message, '| stderr:', stderr.trim());
+        return resolve(null);
+      }
+      const ver = stdout.trim();
+      updaterLog('INFO', 'opencode --version output:', JSON.stringify(ver));
+      resolve(ver || null);
     });
     if (child.pid) childPids.add(child.pid);
+    if (child.stderr) child.stderr.on('data', (d) => { stderr += d.toString(); });
   });
 }
 
@@ -852,7 +875,13 @@ async function applyPendingUpdate() {
   const { version: pendingVer, binary, sha256, forced } = pending;
   updaterLog('INFO', 'Pending update v' + pendingVer, '| binary:', binary, '| forced:', forced);
 
-  // 3. Compare with local version
+  // 3. Skip if this version was previously marked as bad (smoke test failed)
+  if (pending.smokeTestFailed) {
+    updaterLog('INFO', 'Pending v' + pendingVer + ' was previously marked as smoke-test-failed, skipping');
+    return { applied: false, reason: 'smoke_test_failed' };
+  }
+
+  // 4. Compare with local version
   const currentVer = await getOpencodeVersion();
   if (currentVer && compareVersions(pendingVer, currentVer) <= 0) {
     updaterLog('INFO', 'Pending v' + pendingVer + ' <= local v' + currentVer + ', skipping');
@@ -903,6 +932,13 @@ async function applyPendingUpdate() {
 
     fs.copyFileSync(extracted, destBin);
     if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
+    // Remove macOS quarantine attribute so Gatekeeper won't kill unsigned binary
+    if (process.platform === 'darwin') {
+      try {
+        require('child_process').execFileSync('xattr', ['-d', 'com.apple.quarantine', destBin]);
+        updaterLog('INFO', 'Removed quarantine attribute from', destBin);
+      } catch (_) { /* attribute may not exist, ignore */ }
+    }
 
     // 7. Smoke test: run `opencode --version` to verify the new binary is executable
     updaterLog('INFO', 'Verifying new binary: running', destBin, '--version');
@@ -919,6 +955,13 @@ async function applyPendingUpdate() {
       } catch (rbErr) {
         updaterLog('ERROR', 'Rollback after smoke test failed:', rbErr.message);
       }
+      // Mark this pending update as bad so we don't retry it endlessly
+      try {
+        pending.smokeTestFailed = true;
+        pending.smokeTestFailedAt = new Date().toISOString();
+        fs.writeFileSync(UPDATE_PENDING_PATH, JSON.stringify(pending, null, 2), 'utf-8');
+        updaterLog('INFO', 'Marked update-pending.json as smoke-test-failed');
+      } catch (_) { /* ignore */ }
       return { applied: false, error: 'smoke_test_failed' };
     }
     updaterLog('INFO', 'Smoke test passed: opencode --version =', newVer);
@@ -943,9 +986,11 @@ async function applyPendingUpdate() {
   }
 }
 
-// NOTE: update-pending.json is NEVER deleted — it can only be overwritten
-// after a successful download + SHA256 verification in backgroundUpdateCheck().
-// download directory is also NEVER deleted — CDN flow naturally overwrites files.
+// NOTE: update-pending.json is NOT deleted after successful application —
+// version comparison prevents re-application. If a smoke test fails, the
+// pending entry is marked with smokeTestFailed=true to prevent retry loops.
+// backgroundUpdateCheck() overwrites it when a new version is available.
+// Download directory is also NEVER deleted — CDN flow naturally overwrites files.
 
 /**
  * Check if there's a pending update available (used internally by main.cjs).
