@@ -98,16 +98,16 @@ function resolveShellEnv() {
       const match = stdout.match(/__PATH_START__(.+?)__PATH_END__/);
       if (match && match[1]) {
         const shellPath = match[1].trim();
-        console.log('[Sidecar] Resolved shell PATH:', shellPath);
+        updaterLog('INFO', 'Resolved shell PATH:', shellPath);
         resolvedShellEnv = { ...process.env, PATH: shellPath };
       } else {
-        console.warn('[Sidecar] Could not resolve shell PATH, using process.env');
+        updaterLog('WARN', 'Could not resolve shell PATH, using process.env');
         resolvedShellEnv = { ...process.env };
       }
       resolve(resolvedShellEnv);
     });
     child.on('error', (err) => {
-      console.warn('[Sidecar] Shell env resolution failed:', err.message);
+      updaterLog('WARN', 'Shell env resolution failed:', err.message);
       resolvedShellEnv = { ...process.env };
       resolve(resolvedShellEnv);
     });
@@ -413,7 +413,7 @@ function downloadFileResumable(url, destPath, onProgress, expectedSize, _attempt
 function installOpencode() {
   // Concurrency lock: if already running, return the existing promise
   if (installState.promise) {
-    console.log('[Sidecar] installOpencode() already in progress, reusing promise');
+    updaterLog('INFO', 'installOpencode() already in progress, reusing promise');
     return installState.promise;
   }
 
@@ -425,7 +425,7 @@ function installOpencode() {
 
 async function _doInstallOpencode() {
   const platformKey = getPlatformKey();
-  console.log('[Sidecar] Installing opencode for platform:', platformKey);
+  updaterLog('INFO', '=== First install started for platform:', platformKey, '===');
 
   // Update state: downloading
   installState.status = 'downloading';
@@ -436,7 +436,7 @@ async function _doInstallOpencode() {
   try {
     // 1. Fetch latest.json
     const latestUrl = `${CDN_BASE}/latest.json`;
-    console.log('[Sidecar] Fetching', latestUrl);
+    updaterLog('INFO', 'Fetching', latestUrl);
     let latest;
     try {
       latest = await fetchJson(latestUrl);
@@ -455,7 +455,7 @@ async function _doInstallOpencode() {
     const downloadUrl = `${CDN_BASE}/${assetName}`;
     const localPath = path.join(DOWNLOAD_DIR, assetName);
 
-    console.log('[Sidecar] Downloading', downloadUrl, '→', localPath);
+    updaterLog('INFO', 'Downloading', downloadUrl, '→', localPath);
 
     // 3. Download
     await downloadFile(downloadUrl, localPath, (percent) => {
@@ -467,7 +467,7 @@ async function _doInstallOpencode() {
     installState.status = 'installing';
     installState.progress = 100;
     installEvents.emit('progress', { status: 'installing', progress: 100 });
-    console.log('[Sidecar] Download complete, verifying SHA256...');
+    updaterLog('INFO', 'Download complete, verifying SHA256...');
 
     if (expectedSha256) {
       const computed = sha256File(localPath);
@@ -476,11 +476,11 @@ async function _doInstallOpencode() {
         try { fs.unlinkSync(localPath); } catch (_) {}
         throw new Error('文件校验失败 (SHA256 不匹配)，请重试');
       }
-      console.log('[Sidecar] SHA256 OK');
+      updaterLog('INFO', 'SHA256 OK');
     }
 
     // 5. Extract
-    console.log('[Sidecar] Extracting...');
+    updaterLog('INFO', 'Extracting archive:', localPath);
     const binDir = path.join(KCODE_DIR, 'bin');
     fs.mkdirSync(binDir, { recursive: true });
     const exeName = process.platform === 'win32' ? 'opencode.exe' : 'opencode';
@@ -494,7 +494,7 @@ async function _doInstallOpencode() {
       const destBin = path.join(binDir, exeName);
       fs.copyFileSync(extracted, destBin);
       if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
-      console.log('[Sidecar] Installed opencode to', destBin);
+      updaterLog('INFO', 'Installed opencode to', destBin);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -504,11 +504,11 @@ async function _doInstallOpencode() {
     installState.status = 'done';
     installState.error = null;
     installEvents.emit('progress', { status: 'done', progress: 100 });
-    console.log('[Sidecar] opencode install complete');
+    updaterLog('INFO', '=== First install complete ===');
     return { success: true };
 
   } catch (err) {
-    console.error('[Sidecar] Install failed:', err.message);
+    updaterLog('ERROR', 'Install failed:', err.message);
     installState.status = 'error';
     installState.error = err.message;
     installEvents.emit('progress', { status: 'error', error: err.message });
@@ -892,8 +892,11 @@ async function applyPendingUpdate() {
     updaterLog('ERROR', 'Backup failed:', err.message);
   }
 
+  updaterLog('INFO', 'Replacing opencode: old v' + (currentVer || 'unknown') + ' → new v' + pendingVer + ' | archive:', binary, '| dest:', destBin);
+
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencode-update-'));
   try {
+    updaterLog('INFO', 'Extracting archive:', binary, '→ tmpDir:', tmpDir);
     await extractArchive(binary, tmpDir);
     const extracted = findFile(tmpDir, exeName);
     if (!extracted) throw new Error('opencode binary not found in archive');
@@ -901,8 +904,26 @@ async function applyPendingUpdate() {
     fs.copyFileSync(extracted, destBin);
     if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
 
+    // 7. Smoke test: run `opencode --version` to verify the new binary is executable
+    updaterLog('INFO', 'Verifying new binary: running', destBin, '--version');
+    const newVer = await getOpencodeVersion();
+    if (!newVer) {
+      updaterLog('ERROR', 'New binary failed smoke test (opencode --version returned nothing), rolling back');
+      // Rollback to backup
+      try {
+        if (fs.existsSync(backupPath)) {
+          fs.copyFileSync(backupPath, destBin);
+          if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
+          updaterLog('INFO', 'Rolled back to previous binary after smoke test failure');
+        }
+      } catch (rbErr) {
+        updaterLog('ERROR', 'Rollback after smoke test failed:', rbErr.message);
+      }
+      return { applied: false, error: 'smoke_test_failed' };
+    }
+    updaterLog('INFO', 'Smoke test passed: opencode --version =', newVer);
+
     updaterLog('INFO', 'Successfully updated opencode to v' + pendingVer);
-    try { fs.unlinkSync(backupPath); } catch (_) {}
     return { applied: true, version: pendingVer };
   } catch (err) {
     updaterLog('ERROR', 'Update extraction failed:', err.message);
@@ -967,12 +988,12 @@ function syncAuthFile(appDataDir) {
     if (fs.existsSync(defaultAuthPath)) {
       fs.mkdirSync(targetDir, { recursive: true });
       fs.copyFileSync(defaultAuthPath, targetAuthPath);
-      console.log('[Sidecar] Synced auth.json to', targetAuthPath);
+      updaterLog('INFO', 'Synced auth.json to', targetAuthPath);
     } else {
-      console.log('[Sidecar] No default auth.json found at', defaultAuthPath);
+      updaterLog('INFO', 'No default auth.json found at', defaultAuthPath);
     }
   } catch (err) {
-    console.warn('[Sidecar] Failed to sync auth.json:', err.message);
+    updaterLog('WARN', 'Failed to sync auth.json:', err.message);
   }
 }
 
@@ -1055,10 +1076,10 @@ async function startSidecar() {
   try {
     const updateResult = await applyPendingUpdate();
     if (updateResult.applied) {
-      console.log('[Sidecar] Applied pending update to v' + updateResult.version);
+      updaterLog('INFO', 'Applied pending update to v' + updateResult.version);
     }
   } catch (err) {
-    console.warn('[Sidecar] applyPendingUpdate error (continuing):', err.message);
+    updaterLog('WARN', 'applyPendingUpdate error (continuing):', err.message);
   }
 
   // Check if already running via server.json
@@ -1067,7 +1088,7 @@ async function startSidecar() {
   if (serverJson && serverJson.pid) {
     try {
       process.kill(serverJson.pid, 0); // check if process alive
-      console.log('[Sidecar] Process', serverJson.pid, 'is alive, verifying HTTP on port', serverJson.port);
+      updaterLog('INFO', 'Process', serverJson.pid, 'is alive, verifying HTTP on port', serverJson.port);
       cachedServerInfo = {
         url: `http://127.0.0.1:${serverJson.port}`,
         token: serverJson.token,
@@ -1077,23 +1098,23 @@ async function startSidecar() {
       // PID alive is not enough — verify HTTP is actually responding
       const healthy = await checkHealth();
       if (healthy) {
-        console.log('[Sidecar] Server verified healthy on port', serverJson.port);
+        updaterLog('INFO', 'Server verified healthy on port', serverJson.port);
         return getServerInfo();
       }
       // Process alive but HTTP not ready — wait a bit and retry
-      console.log('[Sidecar] Process alive but HTTP not ready, waiting...');
+      updaterLog('INFO', 'Process alive but HTTP not ready, waiting...');
       const becameReady = await waitForServerJson(10, 1000);
       if (becameReady) {
-        console.log('[Sidecar] Server became healthy on port', getServerInfo().url);
+        updaterLog('INFO', 'Server became healthy on port', getServerInfo().url);
         return getServerInfo();
       }
       // Still not healthy — treat as stale, kill and restart
-      console.warn('[Sidecar] Process', serverJson.pid, 'not responding, killing and restarting');
+      updaterLog('WARN', 'Process', serverJson.pid, 'not responding, killing and restarting');
       try { process.kill(serverJson.pid, 'SIGTERM'); } catch (_k) { /* ignore */ }
       cachedServerInfo = null;
     } catch (_) {
       // PID dead, stale server.json — continue to start
-      console.log('[Sidecar] Stale server.json found, pid', serverJson.pid, 'is dead');
+      updaterLog('INFO', 'Stale server.json found, pid', serverJson.pid, 'is dead');
       cachedServerInfo = null;
     }
   }
@@ -1103,7 +1124,7 @@ async function startSidecar() {
     throw new Error('opencode not installed');
   }
 
-  console.log('[Sidecar] Starting opencode serve from', binPath);
+  updaterLog('INFO', 'Starting opencode serve from', binPath);
 
   try {
     const dataDir = getAppDataDir();
@@ -1132,12 +1153,12 @@ async function startSidecar() {
     });
 
     sidecarProcess.on('exit', (code) => {
-      console.log('[Sidecar] Process exited with code:', code);
+      updaterLog('INFO', 'Process exited with code:', code);
       sidecarProcess = null;
     });
 
     sidecarProcess.on('error', (err) => {
-      console.error('[Sidecar] Failed to start:', err.message);
+      updaterLog('ERROR', 'Failed to start:', err.message);
       sidecarProcess = null;
     });
 
@@ -1145,12 +1166,12 @@ async function startSidecar() {
     const ready = await waitForServerJson();
     if (ready) {
       const info = getServerInfo();
-      console.log('[Sidecar] Server ready on', info.url);
+      updaterLog('INFO', 'Server ready on', info.url);
     } else {
-      console.warn('[Sidecar] Server did not become healthy in time');
+      updaterLog('WARN', 'Server did not become healthy in time');
     }
   } catch (err) {
-    console.error('[Sidecar] Spawn error:', err);
+    updaterLog('ERROR', 'Spawn error:', err.message);
   }
 
   return getServerInfo();
@@ -1159,7 +1180,7 @@ async function startSidecar() {
 function forceKill(pid) {
   try {
     process.kill(pid, 'SIGKILL');
-    console.log('[Sidecar] SIGKILL sent to pid:', pid);
+    updaterLog('INFO', 'SIGKILL sent to pid:', pid);
   } catch (_) { /* already dead */ }
 }
 
@@ -1168,7 +1189,7 @@ function killSidecar() {
 
   // 1. Collect spawned sidecar process PID
   if (sidecarProcess) {
-    console.log('[Sidecar] Killing spawned process pid:', sidecarProcess.pid);
+    updaterLog('INFO', 'Killing spawned process pid:', sidecarProcess.pid);
     pidsToKill.add(sidecarProcess.pid);
     sidecarProcess = null;
   }
@@ -1185,7 +1206,7 @@ function killSidecar() {
   for (const pid of pidsToKill) {
     try {
       process.kill(pid, 0); // check alive
-      console.log('[Sidecar] Killing pid:', pid);
+      updaterLog('INFO', 'Killing pid:', pid);
       process.kill(pid, 'SIGKILL');
     } catch (_) { /* already dead */ }
   }
@@ -1194,7 +1215,7 @@ function killSidecar() {
   for (const pid of childPids) {
     try {
       process.kill(pid, 'SIGKILL');
-      console.log('[Sidecar] Killed tracked child pid:', pid);
+      updaterLog('INFO', 'Killed tracked child pid:', pid);
     } catch (_) { /* already dead */ }
   }
   childPids.clear();
@@ -1203,10 +1224,10 @@ function killSidecar() {
   try {
     if (fs.existsSync(SERVER_JSON_PATH)) {
       fs.unlinkSync(SERVER_JSON_PATH);
-      console.log('[Sidecar] Removed server.json');
+      updaterLog('INFO', 'Removed server.json');
     }
   } catch (err) {
-    console.warn('[Sidecar] Failed to remove server.json:', err.message);
+    updaterLog('WARN', 'Failed to remove server.json:', err.message);
   }
 
   cachedServerInfo = null;
