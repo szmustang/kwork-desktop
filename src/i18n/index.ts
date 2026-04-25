@@ -38,6 +38,7 @@ const messages = {
     logoutSuccess: '已退出登录。',
     logoutError: '退出登录异常，请联系管理员。',
     // about dialog
+    aboutUs: '关于我们',
     aboutWebsite: '官网',
     aboutTerms: '用户协议',
     aboutPrivacy: '隐私政策',
@@ -94,6 +95,7 @@ const messages = {
     logoutSuccess: 'Successfully logged out.',
     logoutError: 'Logout failed, please contact admin.',
     // about dialog
+    aboutUs: 'About Us',
     aboutWebsite: 'Website',
     aboutTerms: 'Terms of Service',
     aboutPrivacy: 'Privacy Policy',

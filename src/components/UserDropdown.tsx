@@ -49,6 +49,12 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
     setShowLangSub(v => !v)
   }
 
+  const handleAboutClick = () => {
+    setOpen(false)
+    setShowLangSub(false)
+    setShowAbout(true)
+  }
+
   const handleLogoutClick = () => {
     setOpen(false)
     setShowLangSub(false)
@@ -129,6 +135,16 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
                 />
               </div>
             )}
+          </div>
+          {/* 关于我们 */}
+          <div
+            className="user-dropdown-action"
+            onClick={handleAboutClick}
+          >
+            <svg className="user-dropdown-action-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path fillRule="evenodd" clipRule="evenodd" d="M8 14.5C11.5899 14.5 14.5 11.5899 14.5 8C14.5 4.41015 11.5899 1.5 8 1.5C4.41015 1.5 1.5 4.41015 1.5 8C1.5 11.5899 4.41015 14.5 8 14.5ZM8 16C12.4183 16 16 12.4183 16 8C16 3.58172 12.4183 0 8 0C3.58172 0 0 3.58172 0 8C0 12.4183 3.58172 16 8 16ZM8 6.5C8.41421 6.5 8.75 6.83579 8.75 7.25V11.25C8.75 11.6642 8.41421 12 8 12C7.58579 12 7.25 11.6642 7.25 11.25V7.25C7.25 6.83579 7.58579 6.5 8 6.5ZM8 4C7.44772 4 7 4.44772 7 5C7 5.55228 7.44772 6 8 6C8.55228 6 9 5.55228 9 5C9 4.44772 8.55228 4 8 4Z" fill="black" fillOpacity="0.64"/>
+            </svg>
+            <span className="user-dropdown-action-label">{t(lang, 'aboutUs')}</span>
           </div>
           {/* 退出登录 */}
           <button className="user-dropdown-logout" onClick={handleLogoutClick}>
