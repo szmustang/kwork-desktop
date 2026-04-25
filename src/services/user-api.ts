@@ -1,8 +1,8 @@
 // ===== 用户信息查询 API =====
+// 鉴权方式：HMAC-SHA256 签名（在 Electron 主进程完成，密钥不暴露给渲染进程）
+// 接口路径：/manage/api/users/backend/{id}
 
-import { LINGEE_BASE_URL } from '../constants'
-
-/** 用户信息响应（脱敏版） */
+/** 用户信息响应（不脱敏） */
 export interface UserProfileResponse {
   id: string
   tenant?: number
@@ -32,79 +32,31 @@ export interface UserProfileResponse {
   timeUpdated?: number
 }
 
-/** 用户信息 API 基础 URL */
-const USER_API_BASE_URL = LINGEE_BASE_URL
-
 /**
- * 获取用户信息（脱敏版）
+ * 获取用户信息（不脱敏）
  *
- * 调用 GET /manage/api/users/{id}
- * 通过 lingeeBridge.proxyFetch 走主进程代理，绕过渲染进程 CORS 限制
+ * 调用 GET /manage/api/users/backend/{id}
+ * 鉴权：HMAC-SHA256 签名（在 Electron 主进程完成，密钥不出主进程）
+ * 通过 lingeeBridge.fetchUserProfile IPC 调用主进程代理
  *
  * @param userId 用户ID
- * @param token  Bearer Token
  * @throws {Error} 请求失败时抛出错误
  */
-export async function fetchUserProfile(userId: string, token: string): Promise<UserProfileResponse> {
-  const url = `${USER_API_BASE_URL}/manage/api/users/${encodeURIComponent(userId)}`
+export async function fetchUserProfile(userId: string): Promise<UserProfileResponse> {
   const bridge = (window as any).lingeeBridge
 
-  // 优先使用主进程代理（解决 CORS / ERR_CONNECTION_CLOSED 问题）
-  if (bridge?.proxyFetch) {
-    const res = await bridge.proxyFetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    })
-
-    if (!res.ok) {
-      if (res.status === 401) throw new Error('认证失败，Token 无效或已过期')
-      if (res.status === 403) throw new Error('权限不足')
-      if (res.status === 404) throw new Error('用户不存在')
-      throw new Error(res.error || `获取用户信息失败 (HTTP ${res.status})`)
-    }
-
-    // proxyFetch 返回的 body 是字符串，需要解析
-    const contentType = res.headers?.['content-type'] || ''
-    if (!contentType.includes('application/json')) {
-      throw new Error(`响应格式异常，期望 JSON 但收到 ${contentType}`)
-    }
-    let raw: any
-    try {
-      raw = JSON.parse(res.body)
-    } catch {
-      throw new Error('响应格式异常，无法解析 JSON')
-    }
-    // 兼容包装格式：部分 API 返回 { code: 0, data: { ... } }，需要解包
-    // 通过 !('id' in raw) 区分包装响应和直接返回的 profile 对象
-    if (raw && typeof raw === 'object' && 'data' in raw && typeof raw.data === 'object' && raw.data !== null && !('id' in raw)) {
-      return raw.data as UserProfileResponse
-    }
-    return raw as UserProfileResponse
+  if (!bridge?.fetchUserProfile) {
+    throw new Error('用户信息查询需要 Electron 主进程支持（lingeeBridge.fetchUserProfile 不可用）')
   }
 
-  // 回退：直接 fetch（非 Electron 环境）
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-  })
+  const res = await bridge.fetchUserProfile(userId)
 
   if (!res.ok) {
-    if (res.status === 401) throw new Error('认证失败，Token 无效或已过期')
+    if (res.status === 401) throw new Error('HMAC 签名校验失败')
     if (res.status === 403) throw new Error('权限不足')
     if (res.status === 404) throw new Error('用户不存在')
-    throw new Error(`获取用户信息失败 (HTTP ${res.status})`)
+    throw new Error(res.error || `获取用户信息失败 (HTTP ${res.status})`)
   }
 
-  const raw = await res.json()
-  // 兼容包装格式
-  if (raw && typeof raw === 'object' && 'data' in raw && typeof raw.data === 'object' && raw.data !== null && !('id' in raw)) {
-    return raw.data as UserProfileResponse
-  }
-  return raw as UserProfileResponse
+  return res.data as UserProfileResponse
 }

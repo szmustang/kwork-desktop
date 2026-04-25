@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog, shell, clipboard, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { autoUpdater } = require('electron-updater');
 const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, checkOpencodeInstalled, backgroundUpdateCheck, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents, resolveShellEnv } = require('./sidecar.cjs');
 const { startOAuth2Login } = require('./oauth2.cjs');
@@ -388,6 +389,132 @@ ipcMain.handle('lingeeBridge:proxy-fetch', async (_event, url, options) => {
     return { ok: resp.ok, status: resp.status, body: text, headers: respHeaders };
   } catch (err) {
     console.error('[LingeeBridge] proxy-fetch failed:', err.message);
+    return { ok: false, status: 0, error: err.message };
+  }
+});
+
+// ── HMAC-SHA256 签名（密钥仅在主进程，不暴露给渲染进程和 webview） ──
+const MANAGE_HMAC_KEY = '74b5f6bcbe4b47d84bdee02110050040';
+
+/** 构建待签名字符串：query 参数按 key 字典序 + timestamp */
+function buildHmacSignString(params, timestamp) {
+  const sortedKeys = Object.keys(params).sort();
+  const paramStr = sortedKeys.map(k => `${k}=${params[k]}`).join('&');
+  return paramStr ? `${paramStr}&timestamp=${timestamp}` : `timestamp=${timestamp}`;
+}
+
+ipcMain.handle('lingeeBridge:fetch-user-profile', async (event, userId) => {
+  // 仅接受主窗口渲染进程的请求，拒绝 webview 侧调用
+  if (!mainWindow || event.sender !== mainWindow.webContents) {
+    return { ok: false, status: 0, error: 'unauthorized sender' };
+  }
+  if (!userId || typeof userId !== 'string') {
+    return { ok: false, status: 0, error: 'userId is required' };
+  }
+  const url = `${LINGEE_BASE_URL}/manage/api/users/backend/${encodeURIComponent(userId)}`;
+  const timestamp = String(Date.now());
+  const signString = `timestamp=${timestamp}`;
+  const sign = crypto.createHmac('sha256', MANAGE_HMAC_KEY).update(signString).digest('hex');
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    let resp, text;
+    try {
+      resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Manage-Sign': sign,
+          'X-Manage-Timestamp': timestamp,
+        },
+        signal: controller.signal,
+      });
+      text = await resp.text();
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!resp.ok) {
+      return { ok: false, status: resp.status, error: `HTTP ${resp.status}` };
+    }
+
+    const contentType = resp.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return { ok: false, status: resp.status, error: `Unexpected content-type: ${contentType}` };
+    }
+
+    let raw;
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      return { ok: false, status: resp.status, error: 'Invalid JSON response' };
+    }
+
+    // 兼容包装格式：{ code: 0, data: { ... } }
+    if (raw && typeof raw === 'object' && 'data' in raw && typeof raw.data === 'object' && raw.data !== null && !('id' in raw)) {
+      return { ok: true, status: resp.status, data: raw.data };
+    }
+    return { ok: true, status: resp.status, data: raw };
+  } catch (err) {
+    return { ok: false, status: 0, error: err.message };
+  }
+});
+
+// ── 开发环境配置 API（HMAC-SHA256 签名在主进程完成，密钥不暴露给 webview） ──
+const DEV_ENV_BASE_URL = `${LINGEE_BASE_URL}/manage/api/dev-environments/backend`;
+
+ipcMain.handle('lingeeBridge:dev-env-fetch', async (_event, opts) => {
+  if (!opts || typeof opts.path !== 'string') {
+    return { ok: false, status: 0, error: 'path is required' };
+  }
+
+  // Build query params (filter out undefined/null/empty)
+  const queryParams = (opts.queryParams && typeof opts.queryParams === 'object') ? opts.queryParams : {};
+  const cleanParams = {};
+  for (const [key, value] of Object.entries(queryParams)) {
+    if (value !== undefined && value !== null && value !== '') {
+      cleanParams[key] = String(value);
+    }
+  }
+
+  // Build full URL
+  let url = `${DEV_ENV_BASE_URL}${opts.path}`;
+  if (Object.keys(cleanParams).length > 0) {
+    const qs = new URLSearchParams(cleanParams).toString();
+    url = `${url}?${qs}`;
+  }
+
+  // HMAC-SHA256 signing
+  const timestamp = String(Date.now());
+  const signString = buildHmacSignString(cleanParams, timestamp);
+  const sign = crypto.createHmac('sha256', MANAGE_HMAC_KEY).update(signString).digest('hex');
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    let resp, text;
+    try {
+      resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-Manage-Sign': sign,
+          'X-Manage-Timestamp': timestamp,
+        },
+        signal: controller.signal,
+      });
+      text = await resp.text();
+    } finally {
+      clearTimeout(timeout);
+    }
+    const respHeaders = {};
+    for (const key of ['content-type', 'x-request-id']) {
+      const v = resp.headers.get(key);
+      if (v) respHeaders[key] = v;
+    }
+    return { ok: resp.ok, status: resp.status, body: text, headers: respHeaders };
+  } catch (err) {
+    console.error('[LingeeBridge] dev-env-fetch failed:', err.message);
     return { ok: false, status: 0, error: err.message };
   }
 });

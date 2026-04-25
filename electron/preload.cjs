@@ -48,6 +48,9 @@ contextBridge.exposeInMainWorld('lingeeBridge', {
   // ── 通用 HTTP 代理（绕过渲染进程 CORS 限制，由主进程发起请求） ──
   proxyFetch: (url, options) => ipcRenderer.invoke('lingeeBridge:proxy-fetch', url, options),
 
+  // ── 用户信息查询（HMAC 签名在主进程完成，密钥不暴露给渲染进程） ──
+  fetchUserProfile: (userId) => ipcRenderer.invoke('lingeeBridge:fetch-user-profile', userId),
+
   // ── 配置同步（auth/theme/language），主进程存储并广播到所有 webview ──
   updateBridgeConfig: (config) => ipcRenderer.invoke('lingeeBridge:update-config', config),
 

@@ -47,7 +47,6 @@ function UpdateToast({ lang }: { lang: Lang }) {
     if (!api?.onOpencodeUpdateReady) return
 
     const removeOpencodeReady = api.onOpencodeUpdateReady((data: { version: string }) => {
-      console.log('[UpdateToast] Opencode update ready (pre-downloaded):', data.version)
       if (!updateInfo) {
         setUpdateInfo({ version: data.version, type: 'opencode' })
       }
@@ -62,7 +61,6 @@ function UpdateToast({ lang }: { lang: Lang }) {
     if (!api) return
 
     const removeDownloaded = api.onClientUpdateDownloaded?.((data: { version: string }) => {
-      console.log('[UpdateToast] Client update downloaded:', data?.version)
       if (!updateInfo) {
         setUpdateInfo({ version: data?.version || 'unknown', type: 'client' })
       }
@@ -160,8 +158,7 @@ function App() {
   // 登录成功后，拉取用户真实信息（头像、显示名、角色等）
   const fetchAndMergeProfile = useCallback(async (userInfo: UserInfo) => {
     try {
-      const profile = await fetchUserProfile(userInfo.userId, userInfo.token)
-      console.log('[App] fetchUserProfile result:', profile)
+      const profile = await fetchUserProfile(userInfo.userId)
       const merged: UserInfo = {
         ...userInfo,
         displayName: profile.displayName || profile.truename || userInfo.displayName,

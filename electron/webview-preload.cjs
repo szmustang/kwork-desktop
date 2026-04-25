@@ -69,6 +69,9 @@ contextBridge.exposeInMainWorld('lingeeBridge', {
   // Node.js 主进程发起请求，不受浏览器跨域限制
   proxyFetch: (url, options) => ipcRenderer.invoke('lingeeBridge:proxy-fetch', url, options),
 
+  // ── 开发环境配置 API（HMAC 签名在主进程完成，密钥不暴露给 webview） ──
+  devEnvFetch: (path, queryParams) => ipcRenderer.invoke('lingeeBridge:dev-env-fetch', { path, queryParams }),
+
   // ── 生命周期 ──
   onStopRequested: (callback) => {
     _stopCallbacks.add(callback);
