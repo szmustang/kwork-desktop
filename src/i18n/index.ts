@@ -37,6 +37,9 @@ const messages = {
     // logout toast
     logoutSuccess: '已退出登录。',
     logoutError: '退出登录异常，请联系管理员。',
+    // token expired dialog
+    tokenExpiredTitle: '登录已过期',
+    tokenExpiredMessage: '您的登录状态已过期，请重新登录。',
     // about dialog
     aboutUs: '关于我们',
     aboutWebsite: '官网',
@@ -94,6 +97,9 @@ const messages = {
     // logout toast
     logoutSuccess: 'Successfully logged out.',
     logoutError: 'Logout failed, please contact admin.',
+    // token expired dialog
+    tokenExpiredTitle: 'Session Expired',
+    tokenExpiredMessage: 'Your session has expired. Please log in again.',
     // about dialog
     aboutUs: 'About Us',
     aboutWebsite: 'Website',

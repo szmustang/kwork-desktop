@@ -10,6 +10,7 @@ import { logout } from './services/auth-api'
 import { t, type Lang } from './i18n'
 import AboutDialog from './components/AboutDialog'
 import TopToast, { type ToastType } from './components/TopToast'
+import ConfirmDialog from './components/ConfirmDialog'
 import './App.css'
 
 // 错误边界：防止子组件崩溃导致整个页面白屏
@@ -267,17 +268,29 @@ function App() {
     })
   }, [theme, user, appVersion, lang])
 
+  // ── Token 过期确认弹窗状态 ──
+  const [showTokenExpiredDialog, setShowTokenExpiredDialog] = useState(false)
+
+  const handleTokenExpiredConfirm = useCallback(() => {
+    setShowTokenExpiredDialog(false)
+    handleLogout()
+  }, [handleLogout])
+
+  const handleTokenExpiredCancel = useCallback(() => {
+    setShowTokenExpiredDialog(false)
+  }, [])
+
   // ── LingeeBridge: webview 事件监听 ──
   useEffect(() => {
     const bridge = (window as any).lingeeBridge
     const removeWebviewEvent = bridge?.onWebviewEvent?.((eventName: string, _data: any) => {
       if (eventName === 'token-expired') {
-        // webview 报告 token 过期 → 清除登录状态，显示登录页
-        handleLogout()
+        // webview 报告 token 过期 → 弹窗提示用户确认后再登出
+        setShowTokenExpiredDialog(true)
       }
     })
     return () => removeWebviewEvent?.()
-  }, [handleLogout])
+  }, [])
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark')
 
@@ -298,6 +311,15 @@ function App() {
         <LoginPage onLogin={handleLogin} />
         <AboutDialog visible={triggerAbout} onClose={() => setTriggerAbout(false)} appVersion={appVersion} appName={appName} lang={lang} />
         <TopToast visible={!!logoutToast} type={logoutToast?.type} message={logoutToast?.message ?? ''} />
+        <ConfirmDialog
+          visible={showTokenExpiredDialog}
+          title={t(lang, 'tokenExpiredTitle')}
+          message={t(lang, 'tokenExpiredMessage')}
+          confirmText={t(lang, 'confirmOk')}
+          cancelText={t(lang, 'confirmCancel')}
+          onConfirm={handleTokenExpiredConfirm}
+          onCancel={handleTokenExpiredCancel}
+        />
       </>
     )
   }
@@ -346,6 +368,15 @@ function App() {
       {/* 右下角更新提示 */}
       <UpdateToast lang={lang} />
       <TopToast visible={!!logoutToast} type={logoutToast?.type} message={logoutToast?.message ?? ''} />
+      <ConfirmDialog
+        visible={showTokenExpiredDialog}
+        title={t(lang, 'tokenExpiredTitle')}
+        message={t(lang, 'tokenExpiredMessage')}
+        confirmText={t(lang, 'confirmOk')}
+        cancelText={t(lang, 'confirmCancel')}
+        onConfirm={handleTokenExpiredConfirm}
+        onCancel={handleTokenExpiredCancel}
+      />
     </div>
   )
 }
