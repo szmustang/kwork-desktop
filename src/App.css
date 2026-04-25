@@ -683,7 +683,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  border-radius: 32px;
+  border-radius: 32px 32px 0 0;
   position: relative;
   background-color: var(--bg-primary);
   z-index: 1;
