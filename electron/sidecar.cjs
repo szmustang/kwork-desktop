@@ -18,20 +18,21 @@ const UPDATES_DIR = path.join(KCODE_DIR, 'updates');
 const UPDATE_PENDING_PATH = path.join(UPDATES_DIR, 'update-pending.json');
 const DOWNLOAD_DIR = path.join(UPDATES_DIR, 'download');
 const DOWNLOAD_META_PATH = path.join(DOWNLOAD_DIR, '.download-meta.json');
-const UPDATER_LOG_PATH = path.join(UPDATES_DIR, 'updater.log');
+const UPDATER_LOG_PATH = path.join(UPDATES_DIR, 'opencode-update.log');
 const CDN_BASE = 'http://app.cosmicstudio.cn/cosmicai/lingee/update/opencode';
 
 /* ── Updater Logger ── */
 
 /**
- * Append a timestamped log line to ~/.kcode/updates/updater.log.
+ * Append a timestamped log line to ~/.kcode/updates/opencode-update.log.
  * Also prints to console for dev convenience.
  * Log file is auto-rotated when exceeding 1MB.
  */
 const UPDATER_LOG_MAX_SIZE = 1 * 1024 * 1024; // 1MB
 
 function updaterLog(level, ...args) {
-  const ts = new Date().toLocaleString('zh-CN', { hour12: false });
+  const now = new Date();
+  const ts = now.toLocaleString('zh-CN', { hour12: false }) + '.' + String(now.getMilliseconds()).padStart(3, '0');
   const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
   const line = `[${ts}] [${level}] ${msg}\n`;
   // Console output
@@ -250,6 +251,22 @@ function downloadFileResumable(url, destPath, onProgress, expectedSize, _attempt
       return resolve(destPath);
     }
 
+    // Resume safety: truncate back by a small margin (8KB) to avoid
+    // corrupted tail bytes from a previous interrupted write.
+    const RESUME_SAFETY_MARGIN = 8 * 1024; // 8KB
+    if (existingSize > RESUME_SAFETY_MARGIN) {
+      existingSize = existingSize - RESUME_SAFETY_MARGIN;
+      try {
+        fs.truncateSync(destPath, existingSize);
+        updaterLog('INFO', 'Truncated partial file to', existingSize, 'bytes (safety margin)');
+      } catch (err) {
+        updaterLog('WARN', 'Failed to truncate partial file:', err.message);
+        // If truncate fails, delete and start fresh
+        try { fs.unlinkSync(destPath); } catch (_) {}
+        existingSize = 0;
+      }
+    }
+
     const isResuming = existingSize > 0;
     const headers = {};
     if (isResuming) {
@@ -280,26 +297,70 @@ function downloadFileResumable(url, destPath, onProgress, expectedSize, _attempt
       downloadFileResumable(url, destPath, onProgress, expectedSize, _attempt + 1).then(resolve, reject);
     }
 
+    // Log the outgoing request details for troubleshooting
+    const reqHeaders = { ...headers };
+    updaterLog('INFO', `>> GET ${url} (attempt ${_attempt + 1}/3, existingSize=${existingSize}, expectedSize=${expectedSize || 'unknown'})`);
+    if (Object.keys(reqHeaders).length > 0) {
+      updaterLog('INFO', '>> Request headers:', JSON.stringify(reqHeaders));
+    }
+
     const client = url.startsWith('https') ? https : http;
     const req = client.get(url, { timeout: 120000, headers }, (res) => {
+      // Log the response details
+      const respInfo = {
+        status: res.statusCode,
+        contentLength: res.headers['content-length'] || 'N/A',
+        contentRange: res.headers['content-range'] || 'N/A',
+        contentType: res.headers['content-type'] || 'N/A',
+      };
+      updaterLog('INFO', `<< Response: ${res.statusCode}`, JSON.stringify(respInfo));
+
       // Follow redirect
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
+        updaterLog('INFO', '<< Redirect to:', res.headers.location);
         return downloadFileResumable(res.headers.location, destPath, onProgress, expectedSize, _attempt).then(resolve, reject);
+      }
+
+      // 416 Range Not Satisfiable = our offset exceeds file size on CDN.
+      // Delete partial file and restart immediately (don't waste a retry attempt).
+      if (res.statusCode === 416) {
+        res.resume();
+        updaterLog('WARN', 'Server returned 416 Range Not Satisfiable (existingSize=' + existingSize + '), restarting from scratch');
+        try { fs.unlinkSync(destPath); } catch (_) {}
+        try { fs.unlinkSync(DOWNLOAD_META_PATH); } catch (_) {}
+        return downloadFileResumable(url, destPath, onProgress, expectedSize, _attempt).then(resolve, reject);
       }
 
       // 206 Partial Content = resume accepted
       // 200 OK = server doesn't support Range, restart from scratch
       if (res.statusCode === 200 && isResuming) {
-        updaterLog('INFO', 'Server does not support Range, restarting download');
+        updaterLog('INFO', 'Server does not support Range (returned 200 instead of 206), restarting download');
         existingSize = 0; // reset
       } else if (res.statusCode !== 200 && res.statusCode !== 206) {
         res.resume();
+        updaterLog('ERROR', `<< Unexpected HTTP ${res.statusCode}, headers:`, JSON.stringify(res.headers));
         return retryOrFail(new Error(`HTTP ${res.statusCode} downloading ${url}`));
+      }
+
+      // Validate Content-Range on 206: ensure server offset matches our request
+      if (res.statusCode === 206) {
+        const cr = res.headers['content-range'] || '';
+        // Expected format: "bytes <start>-<end>/<total>"
+        const match = cr.match(/^bytes\s+(\d+)-/);
+        if (match && parseInt(match[1], 10) !== existingSize) {
+          res.resume();
+          updaterLog('WARN', 'Content-Range mismatch: expected start=' + existingSize + ' but got "' + cr + '", restarting');
+          try { fs.unlinkSync(destPath); } catch (_) {}
+          try { fs.unlinkSync(DOWNLOAD_META_PATH); } catch (_) {}
+          return downloadFileResumable(url, destPath, onProgress, expectedSize, _attempt).then(resolve, reject);
+        }
+        updaterLog('INFO', 'Resume accepted, Content-Range:', cr);
       }
 
       const contentLength = parseInt(res.headers['content-length'], 10) || 0;
       const total = res.statusCode === 206 ? existingSize + contentLength : contentLength;
+      updaterLog('INFO', 'Download stream started: contentLength=' + contentLength + ', totalExpected=' + total + ', mode=' + (res.statusCode === 206 ? 'resume' : 'full'));
       let downloaded = existingSize;
 
       const fileFlags = res.statusCode === 206 ? 'a' : 'w'; // append or overwrite
@@ -313,21 +374,32 @@ function downloadFileResumable(url, destPath, onProgress, expectedSize, _attempt
       res.pipe(file);
       file.on('finish', () => {
         file.close(() => {
+          // Validate final file size if expectedSize is known
+          if (expectedSize && downloaded !== expectedSize) {
+            updaterLog('WARN', 'File size mismatch after download: got', downloaded, 'expected', expectedSize, ', retrying');
+            return retryOrFail(new Error(`File size mismatch: got ${downloaded}, expected ${expectedSize}`));
+          }
           updaterLog('INFO', 'Download complete:', destPath, `(${downloaded} bytes)`);
           resolve(destPath);
         });
       });
       file.on('error', (err) => {
+        updaterLog('ERROR', 'File write error:', err.message, '(downloaded=' + downloaded + ')');
+        retryOrFail(err);
+      });
+      res.on('error', (err) => {
+        updaterLog('ERROR', 'Response stream error:', err.message, '(downloaded=' + downloaded + ')');
+        file.destroy();
         retryOrFail(err);
       });
     });
     req.on('error', (err) => {
-      updaterLog('ERROR', 'Download network error:', err.message);
+      updaterLog('ERROR', 'Download network error:', err.message, '(code=' + (err.code || 'N/A') + ')');
       retryOrFail(err);
     });
     req.on('timeout', () => {
       req.destroy();
-      updaterLog('ERROR', 'Download timeout');
+      updaterLog('ERROR', 'Download timeout after 120s (downloaded=' + existingSize + ' of ' + (expectedSize || 'unknown') + ')');
       retryOrFail(new Error('Download timeout'));
     });
   });
@@ -427,13 +499,7 @@ async function _doInstallOpencode() {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
 
-    // 6. Cleanup download file
-    try {
-      fs.unlinkSync(localPath);
-      // Remove download dir if empty
-      const remaining = fs.readdirSync(DOWNLOAD_DIR);
-      if (remaining.length === 0) fs.rmdirSync(DOWNLOAD_DIR);
-    } catch (_) {}
+    // Download file and download dir are kept — CDN flow naturally overwrites them.
 
     installState.status = 'done';
     installState.error = null;
@@ -560,8 +626,8 @@ async function _doBackgroundUpdateCheck() {
 
   updaterLog('INFO', 'New version available: v' + remoteVersion + ', downloading', assetName);
 
-  // 6. Pre-check: if a partial file exists, verify it belongs to the same version.
-  //    Compare against stored download metadata to detect version change.
+  // 6. Pre-check: if a partial file exists, verify it belongs to the same version/build.
+  //    Compare against stored download metadata to detect version change or file repackaging.
   if (fs.existsSync(localPath)) {
     let shouldDelete = false;
     try {
@@ -570,6 +636,19 @@ async function _doBackgroundUpdateCheck() {
         if (meta.version !== remoteVersion || meta.sha256 !== expectedSha256) {
           updaterLog('INFO', 'Partial file belongs to v' + meta.version + ' but now need v' + remoteVersion + ', deleting stale file');
           shouldDelete = true;
+        } else if (expectedSize && meta.expectedSize && meta.expectedSize !== expectedSize) {
+          // Same version but file was repackaged on CDN (size changed)
+          updaterLog('INFO', 'File size mismatch: local meta expects', meta.expectedSize, 'but CDN reports', expectedSize, ', deleting stale file');
+          shouldDelete = true;
+        } else {
+          // Also check if partial file is already larger than expected (CDN file shrunk)
+          try {
+            const partialSize = fs.statSync(localPath).size;
+            if (expectedSize && partialSize > expectedSize) {
+              updaterLog('INFO', 'Partial file (' + partialSize + ' bytes) exceeds expected size (' + expectedSize + '), deleting stale file');
+              shouldDelete = true;
+            }
+          } catch (_) {}
         }
       } else {
         // No metadata file — can't verify, safer to delete and re-download
