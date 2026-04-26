@@ -501,6 +501,12 @@ async function _doInstallOpencode() {
           updaterLog('INFO', 'Removed quarantine attribute from', destBin);
         } catch (_) { /* attribute may not exist, ignore */ }
       }
+      // On Windows, antivirus may lock newly written exe for scanning.
+      // Wait before proceeding so subsequent spawn won't hit EBUSY/EACCES.
+      if (process.platform === 'win32') {
+        updaterLog('INFO', 'Windows: waiting 15s for antivirus scan after install');
+        await new Promise(r => setTimeout(r, 15000));
+      }
       updaterLog('INFO', 'Installed opencode to', destBin);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -941,10 +947,28 @@ async function applyPendingUpdate() {
     }
 
     // 7. Smoke test: run `opencode --version` to verify the new binary is executable
+    //    On Windows, antivirus (e.g. Defender) may lock newly written exe for scanning,
+    //    so we wait before the first attempt and retry a few times if it fails.
+    const SMOKE_INITIAL_DELAY = process.platform === 'win32' ? 15000 : 0;
+    const SMOKE_RETRY_COUNT   = process.platform === 'win32' ? 3 : 0;
+    const SMOKE_RETRY_INTERVAL = 5000;
+
+    if (SMOKE_INITIAL_DELAY > 0) {
+      updaterLog('INFO', 'Windows: waiting ' + (SMOKE_INITIAL_DELAY / 1000) + 's for antivirus scan before smoke test');
+      await new Promise(r => setTimeout(r, SMOKE_INITIAL_DELAY));
+    }
+
     updaterLog('INFO', 'Verifying new binary: running', destBin, '--version');
-    const newVer = await getOpencodeVersion();
+    let newVer = await getOpencodeVersion();
+
+    for (let attempt = 1; !newVer && attempt <= SMOKE_RETRY_COUNT; attempt++) {
+      updaterLog('WARN', 'Smoke test attempt ' + attempt + ' failed, retrying in ' + (SMOKE_RETRY_INTERVAL / 1000) + 's...');
+      await new Promise(r => setTimeout(r, SMOKE_RETRY_INTERVAL));
+      newVer = await getOpencodeVersion();
+    }
+
     if (!newVer) {
-      updaterLog('ERROR', 'New binary failed smoke test (opencode --version returned nothing), rolling back');
+      updaterLog('ERROR', 'New binary failed smoke test after all attempts, rolling back');
       // Rollback to backup
       try {
         if (fs.existsSync(backupPath)) {
