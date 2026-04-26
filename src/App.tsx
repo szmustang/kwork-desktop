@@ -100,7 +100,7 @@ function UpdateToast({ lang }: { lang: Lang }) {
         </svg>
       </div>
       <div className="update-toast-text">
-        <strong>{t(lang, 'updateUpdatedTo')} {updateInfo.version}</strong>
+        <strong>{t(lang, isOpencode ? 'updateBuild' : 'updateClient')} {t(lang, 'updateUpdatedTo')} {updateInfo.version}</strong>
         <p>{t(lang, 'updateRelaunchHint')}</p>
       </div>
       <div className="update-toast-actions">

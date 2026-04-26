@@ -12,7 +12,7 @@ const messages = {
     // update toast
     updateNewVersion: '发现新版本',
     updateBuild: 'Build',
-    updateClient: '客户端',
+    updateClient: '灵基',
     updateDownloadFailed: '下载失败，请点击重试',
     updateDownloaded: '下载完成，点击「重启安装」应用更新',
     updateAvailable: '有新版本可用，是否立即更新？',
