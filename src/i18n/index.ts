@@ -45,6 +45,7 @@ const messages = {
     aboutWebsite: '官网',
     aboutTerms: '用户协议',
     aboutPrivacy: '隐私政策',
+    comingSoon: '开发中，敬请期待...',
     // opencode setup
     setupNewVersion: '发现新版 Kingdee Code',
     setupDownloading: '正在下载 Kingdee Code，请稍候...',
@@ -105,6 +106,7 @@ const messages = {
     aboutWebsite: 'Website',
     aboutTerms: 'Terms of Service',
     aboutPrivacy: 'Privacy Policy',
+    comingSoon: 'Coming soon, stay tuned...',
     // opencode setup
     setupNewVersion: 'New version of Kingdee Code found',
     setupDownloading: 'Downloading Kingdee Code, please wait...',
