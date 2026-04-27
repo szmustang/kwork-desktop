@@ -1,0 +1,71 @@
+/* ===== WebView 加载失败 - 错误覆盖层 ===== */
+
+.wv-error-overlay {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: var(--bg-primary);
+}
+
+.wv-error-card {
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  padding: 48px 32px;
+}
+
+.wv-error-icon {
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.wv-error-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.wv-error-desc {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.wv-error-detail {
+  margin: 0 0 24px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  word-break: break-all;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.wv-error-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 28px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  background: var(--primary-600, #2970FF);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+
+.wv-error-retry-btn:hover {
+  background: var(--primary-700, #1D5BD6);
+}
+
+.wv-error-retry-btn:active {
+  transform: scale(0.97);
+}

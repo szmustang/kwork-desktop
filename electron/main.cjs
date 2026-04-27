@@ -173,6 +173,22 @@ function createWindow() {
     });
   }
 
+  // 窗口恢复显示时，主动检查 token 是否已过期
+  // 解决 macOS hide→show 后 token 过期但界面不跳登录页的问题
+  mainWindow.on('show', () => {
+    if (currentBridgeConfig.auth && currentBridgeConfig.auth.expiresAt) {
+      if (Date.now() >= currentBridgeConfig.auth.expiresAt) {
+        console.warn('[Main] Token expired on window show, clearing auth and notifying renderer');
+        currentBridgeConfig = { ...currentBridgeConfig, auth: null };
+        persistBridgeConfig();
+        broadcastToWebviews('lingeeBridge:config-changed', currentBridgeConfig);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('lingeeBridge:webview-event', 'token-expired', {});
+        }
+      }
+    }
+  });
+
   if (devServerURL) {
     mainWindow.loadURL(devServerURL);
   } else {

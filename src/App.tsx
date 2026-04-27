@@ -351,10 +351,10 @@ function App() {
       <main className="main-content">
         <ErrorBoundary lang={lang}>
           <div style={{ display: activeTab === 'chat' ? 'contents' : 'none' }}>
-            <ChatTab />
+            <ChatTab lang={lang} />
           </div>
           <div style={{ display: activeTab === 'work' ? 'contents' : 'none' }}>
-            <WorkTab />
+            <WorkTab lang={lang} />
           </div>
           <div style={{ display: activeTab === 'dev' ? 'contents' : 'none' }}>
             <DevTab setup={openCodeSetup} lang={lang} />

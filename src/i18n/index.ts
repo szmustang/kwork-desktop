@@ -60,6 +60,12 @@ const messages = {
     setupRetry: '重试',
     setupStartFailed: '启动 Kingdee Code 服务失败',
     setupInstallFailed: '安装失败',
+    // webview error overlay
+    webviewNetworkError: '网络连接失败',
+    webviewNetworkErrorDesc: '无法访问页面，请检查网络连接或代理设置后重试。',
+    webviewLoadError: '页面加载失败',
+    webviewLoadErrorDesc: '页面未能正常加载，请稍后重试。',
+    webviewRetry: '重新加载',
   },
   en: {
     // tabs
@@ -120,6 +126,12 @@ const messages = {
     setupRetry: 'Retry',
     setupStartFailed: 'Failed to start Kingdee Code service',
     setupInstallFailed: 'Installation failed',
+    // webview error overlay
+    webviewNetworkError: 'Network Connection Failed',
+    webviewNetworkErrorDesc: 'Unable to load the page. Please check your network connection or proxy settings and try again.',
+    webviewLoadError: 'Page Load Failed',
+    webviewLoadErrorDesc: 'The page failed to load. Please try again later.',
+    webviewRetry: 'Reload',
   },
 } as const
 
