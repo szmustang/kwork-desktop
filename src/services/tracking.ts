@@ -18,8 +18,8 @@ export async function trackUserLogin(userInfo: {
     const result = await (window as any).lingeeBridge.sendTrackingEvent({
       event_name: 'user_login',
       event_time: Date.now(),
-      user_id: userInfo.userId,
-      tenant_id: userInfo.tenantId,
+      user_id: userInfo.userId || '',
+      tenant_id: userInfo.tenantId || '',
       var: {
         source: 'shell',
       }
