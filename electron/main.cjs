@@ -6,6 +6,7 @@ const { autoUpdater } = require('electron-updater');
 const { startSidecar, killSidecar, getServerInfo, isOpencodeInstalled, checkOpencodeInstalled, backgroundUpdateCheck, getOpencodeVersion, checkPendingUpdate, installOpencode, getInstallState, installEvents, resolveShellEnv } = require('./sidecar.cjs');
 const { startOAuth2Login } = require('./oauth2.cjs');
 const { LINGEE_BASE_URL } = require('./constants.cjs');
+const tracking = require('./tracking.cjs');
 const devServerURL = process.env.VITE_DEV_SERVER_URL;
 
 // 禁止 macOS 恢复上次窗口状态（最小化/隐藏记忆），这是打包后窗口不弹出的根本原因
@@ -559,6 +560,16 @@ ipcMain.handle('lingeeBridge:notify', (_event, eventName, data) => {
   return { ok: KNOWN_BRIDGE_EVENTS.has(eventName) };
 });
 
+ipcMain.handle('tracking:send-event', async (_event, eventData) => {
+  try {
+    const result = await tracking.sendTrackingEvent(eventData)
+    return result
+  } catch (err) {
+    console.error('[Tracking] send failed:', err)
+    return { success: false, error: err.message || String(err) }
+  }
+})
+
 ipcMain.handle('install-client-update', () => {
   killSidecar();
   // macOS: 必须先设置 forceQuit，否则 close 事件拦截会阻止退出，导致窗口仅被隐藏
@@ -809,6 +820,11 @@ app.whenReady().then(async () => {
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
   }
   createWindow();
+
+  // 启动时补传上次失败的埋点缓存
+  tracking.flushCachedEvents().catch(err => {
+    console.error('[Tracking] flush cache failed:', err)
+  })
 }).catch((err) => {
   console.error('[main] whenReady failed:', err);
 });

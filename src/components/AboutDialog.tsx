@@ -51,7 +51,7 @@ export default function AboutDialog({ visible, onClose, appVersion, appName, lan
           <div className="about-logo">
             <img src={appIcon} alt="Lingee" className="about-logo-img" />
             <div className="about-logo-text">
-              <span className="about-product-name">{appName || 'Kingdee Lingee'}</span>
+              <span className="about-product-name">{t(lang, 'appName')}</span>
             </div>
           </div>
           {appVersion && (

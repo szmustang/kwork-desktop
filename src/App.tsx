@@ -7,6 +7,7 @@ import DevTab from './components/DevTab'
 import { useOpenCodeSetup } from './components/dev/OpenCodeSetup'
 import { fetchUserProfile } from './services/user-api'
 import { logout } from './services/auth-api'
+import { trackUserLogin } from './services/tracking'
 import { t, type Lang } from './i18n'
 import AboutDialog from './components/AboutDialog'
 import TopToast, { type ToastType } from './components/TopToast'
@@ -180,26 +181,28 @@ function App() {
     }
   }, [])
 
+  // ── 通用 Toast 状态 ──
+  const [toast, setToast] = useState<{ type: ToastType; message: string } | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>()
+
+  const showToast = useCallback((type: ToastType, message: string, duration = 3000) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast({ type, message })
+    toastTimer.current = setTimeout(() => setToast(null), duration)
+  }, [])
+
+  useEffect(() => {
+    return () => { if (toastTimer.current) clearTimeout(toastTimer.current) }
+  }, [])
+
   const handleLogin = useCallback((userInfo: UserInfo) => {
     localStorage.setItem('lingee-user', JSON.stringify(userInfo))
     setUser(userInfo)
     // 异步拉取完整用户信息并更新
     fetchAndMergeProfile(userInfo)
+    // 登录埋点（fire-and-forget，不阻塞 UI）
+    trackUserLogin({ userId: userInfo.userId, tenantId: userInfo.tenantId })
   }, [fetchAndMergeProfile])
-
-  // ── 登出 Toast 状态 ──
-  const [logoutToast, setLogoutToast] = useState<{ type: ToastType; message: string } | null>(null)
-  const logoutToastTimer = useRef<ReturnType<typeof setTimeout>>()
-
-  const showLogoutToast = useCallback((type: ToastType, message: string) => {
-    if (logoutToastTimer.current) clearTimeout(logoutToastTimer.current)
-    setLogoutToast({ type, message })
-    logoutToastTimer.current = setTimeout(() => setLogoutToast(null), 3000)
-  }, [])
-
-  useEffect(() => {
-    return () => { if (logoutToastTimer.current) clearTimeout(logoutToastTimer.current) }
-  }, [])
 
   // 用 ref 追踪最新的 user/lang，避免 handleLogout 依赖它们导致频繁重建
   const userRef = useRef(user)
@@ -214,11 +217,11 @@ function App() {
     setUser(null)
     try {
       if (token) await logout(token)
-      showLogoutToast('success', t(langRef.current, 'logoutSuccess'))
+      showToast('success', t(langRef.current, 'logoutSuccess'))
     } catch {
-      showLogoutToast('error', t(langRef.current, 'logoutError'))
+      showToast('error', t(langRef.current, 'logoutError'))
     }
-  }, [showLogoutToast])
+  }, [showToast])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -307,7 +310,7 @@ function App() {
       <>
         <LoginPage onLogin={handleLogin} />
         <AboutDialog visible={triggerAbout} onClose={() => setTriggerAbout(false)} appVersion={appVersion} appName={appName} lang={lang} />
-        <TopToast visible={!!logoutToast} type={logoutToast?.type} message={logoutToast?.message ?? ''} />
+        <TopToast visible={!!toast} type={toast?.type} message={toast?.message ?? ''} />
         <ConfirmDialog
           visible={showTokenExpiredDialog}
           title={t(lang, 'tokenExpiredTitle')}
@@ -364,7 +367,7 @@ function App() {
 
       {/* 右下角更新提示 */}
       <UpdateToast lang={lang} />
-      <TopToast visible={!!logoutToast} type={logoutToast?.type} message={logoutToast?.message ?? ''} />
+      <TopToast visible={!!toast} type={toast?.type} message={toast?.message ?? ''} />
       <ConfirmDialog
         visible={showTokenExpiredDialog}
         title={t(lang, 'tokenExpiredTitle')}

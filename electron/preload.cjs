@@ -63,6 +63,10 @@ contextBridge.exposeInMainWorld('lingeeBridge', {
 
   // ── 客户端自动更新 ──
   installClientUpdate: () => ipcRenderer.invoke('install-client-update'),
+
+  // ── 埋点 ──
+  sendTrackingEvent: (eventData) => ipcRenderer.invoke('tracking:send-event', eventData),
+
   onClientUpdateDownloaded: (cb) => {
     const listener = (_, data) => cb(data);
     ipcRenderer.on('client-update-downloaded', listener);

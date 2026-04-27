@@ -41,6 +41,7 @@ const messages = {
     tokenExpiredTitle: '登录已过期',
     tokenExpiredMessage: '您的登录状态已过期，请重新登录。',
     // about dialog
+    appName: '金蝶灵基',
     aboutUs: '关于我们',
     aboutWebsite: '官网',
     aboutTerms: '用户协议',
@@ -108,6 +109,7 @@ const messages = {
     tokenExpiredTitle: 'Session Expired',
     tokenExpiredMessage: 'Your session has expired. Please log in again.',
     // about dialog
+    appName: 'Kingdee Lingee',
     aboutUs: 'About Us',
     aboutWebsite: 'Website',
     aboutTerms: 'Terms of Service',
