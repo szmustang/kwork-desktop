@@ -72,6 +72,9 @@ contextBridge.exposeInMainWorld('lingeeBridge', {
   // ── 开发环境配置 API（HMAC 签名在主进程完成，密钥不暴露给 webview） ──
   devEnvFetch: (path, queryParams) => ipcRenderer.invoke('lingeeBridge:dev-env-fetch', { path, queryParams }),
 
+  // ── 已签名的后端 API 代理（HMAC 签名在主进程完成，密钥不暴露给 webview） ──
+  signedBackendFetch: (url, options) => ipcRenderer.invoke('lingeeBridge:signed-backend-fetch', url, options),
+
   // ── 生命周期 ──
   onStopRequested: (callback) => {
     _stopCallbacks.add(callback);
