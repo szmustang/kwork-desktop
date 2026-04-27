@@ -1,5 +1,7 @@
+import { useEffect, useRef, useState } from 'react'
 import { t, type Lang } from '../i18n'
 import appIcon from '../../build/icon.png'
+import TopToast from './TopToast'
 
 interface AboutDialogProps {
   visible: boolean
@@ -10,10 +12,34 @@ interface AboutDialogProps {
 }
 
 export default function AboutDialog({ visible, onClose, appVersion, appName, lang }: AboutDialogProps) {
+  const [showComingSoon, setShowComingSoon] = useState(false)
+  const comingSoonTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleComingSoon = () => {
+    setShowComingSoon(true)
+    if (comingSoonTimer.current) clearTimeout(comingSoonTimer.current)
+    comingSoonTimer.current = setTimeout(() => setShowComingSoon(false), 3000)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (comingSoonTimer.current) clearTimeout(comingSoonTimer.current)
+    }
+  }, [])
+
+  // 弹窗关闭时一并清除 toast，避免残留
+  useEffect(() => {
+    if (!visible) {
+      setShowComingSoon(false)
+      if (comingSoonTimer.current) clearTimeout(comingSoonTimer.current)
+    }
+  }, [visible])
+
   if (!visible) return null
 
   return (
     <>
+      <TopToast visible={showComingSoon} type="info" message={t(lang, 'comingSoon')} />
       <div className="about-dialog-overlay" onClick={onClose} />
       <div className="about-dialog">
         <button className="about-dialog-close" onClick={onClose}>
@@ -32,11 +58,11 @@ export default function AboutDialog({ visible, onClose, appVersion, appName, lan
             <div className="about-version-badge">v{appVersion}</div>
           )}
           <div className="about-links">
-            <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">{t(lang, 'aboutWebsite')}</a>
+            <a href="#about-website" onClick={(e) => { e.preventDefault(); handleComingSoon() }}>{t(lang, 'aboutWebsite')}</a>
             <span className="about-links-sep" />
-            <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">{t(lang, 'aboutTerms')}</a>
+            <a href="#about-terms" onClick={(e) => { e.preventDefault(); handleComingSoon() }}>{t(lang, 'aboutTerms')}</a>
             <span className="about-links-sep" />
-            <a href="https://dev.kingdee.com/kwc" target="_blank" rel="noopener noreferrer">{t(lang, 'aboutPrivacy')}</a>
+            <a href="#about-privacy" onClick={(e) => { e.preventDefault(); handleComingSoon() }}>{t(lang, 'aboutPrivacy')}</a>
           </div>
           <div className="about-copyright">Copyright &copy; 2026 Kingdee. All rights reserved.</div>
         </div>

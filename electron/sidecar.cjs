@@ -190,6 +190,13 @@ function downloadFile(url, destPath, onProgress) {
   return new Promise((resolve, reject) => {
     fs.mkdirSync(path.dirname(destPath), { recursive: true });
     const client = url.startsWith('https') ? https : http;
+    let settled = false;
+    function fail(err) {
+      if (settled) return;
+      settled = true;
+      fs.unlink(destPath, () => {});
+      reject(err);
+    }
     const req = client.get(url, { timeout: 60000 }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
@@ -197,7 +204,7 @@ function downloadFile(url, destPath, onProgress) {
       }
       if (res.statusCode < 200 || res.statusCode >= 300) {
         res.resume();
-        return reject(new Error(`HTTP ${res.statusCode} downloading ${url}`));
+        return fail(new Error(`HTTP ${res.statusCode} downloading ${url}`));
       }
       const total = parseInt(res.headers['content-length'], 10) || 0;
       let downloaded = 0;
@@ -209,20 +216,28 @@ function downloadFile(url, destPath, onProgress) {
         }
       });
       res.pipe(file);
-      file.on('finish', () => { file.close(() => resolve(destPath)); });
-      file.on('error', (err) => {
-        fs.unlink(destPath, () => {});
-        reject(err);
+      file.on('finish', () => {
+        file.close(() => {
+          // Validate downloaded size against Content-Length to detect truncation
+          if (total > 0 && downloaded !== total) {
+            updaterLog('ERROR', 'Download truncated: got', downloaded, 'bytes, expected', total);
+            return fail(new Error(`Download truncated: got ${downloaded} bytes, expected ${total}`));
+          }
+          if (settled) return;
+          settled = true;
+          resolve(destPath);
+        });
+      });
+      file.on('error', fail);
+      res.on('error', (err) => {
+        file.destroy();
+        fail(err);
       });
     });
-    req.on('error', (err) => {
-      fs.unlink(destPath, () => {});
-      reject(err);
-    });
+    req.on('error', fail);
     req.on('timeout', () => {
       req.destroy();
-      fs.unlink(destPath, () => {});
-      reject(new Error('Download timeout'));
+      fail(new Error('Download timeout'));
     });
   });
 }
@@ -494,12 +509,25 @@ async function _doInstallOpencode() {
       const destBin = path.join(binDir, exeName);
       fs.copyFileSync(extracted, destBin);
       if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
+      // Remove macOS quarantine attribute so Gatekeeper won't kill unsigned binary
+      if (process.platform === 'darwin') {
+        try {
+          require('child_process').execFileSync('xattr', ['-d', 'com.apple.quarantine', destBin]);
+          updaterLog('INFO', 'Removed quarantine attribute from', destBin);
+        } catch (_) { /* attribute may not exist, ignore */ }
+      }
+      // On Windows, antivirus may lock newly written exe for scanning.
+      // Wait before proceeding so subsequent spawn won't hit EBUSY/EACCES.
+      if (process.platform === 'win32') {
+        updaterLog('INFO', 'Windows: waiting 15s for antivirus scan after install');
+        await new Promise(r => setTimeout(r, 15000));
+      }
       updaterLog('INFO', 'Installed opencode to', destBin);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
 
-    // Download file and download dir are kept — CDN flow naturally overwrites them.
+    // Download dir is cleaned after successful applyPendingUpdate().
 
     installState.status = 'done';
     installState.error = null;
@@ -737,14 +765,32 @@ function getInstallState() {
 }
 
 function getOpencodeVersion() {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     if (!isOpencodeInstalled()) return resolve(null);
-    const child = execFile(getOpencodeBinPath(), ['--version'], { timeout: 5000 }, (err, stdout) => {
+    const binPath = getOpencodeBinPath();
+    // Use resolved shell environment (same as startSidecar) to ensure
+    // opencode can find any runtime dependencies via PATH
+    let env;
+    try {
+      env = await resolveShellEnv();
+    } catch (_) {
+      env = process.env;
+    }
+    let stderr = '';
+    // Intel Macs do code-signature verification in software (no Secure Enclave),
+    // first execution of a freshly-written binary can take >5s. Use 15s timeout.
+    const child = execFile(binPath, ['--version'], { timeout: 15000, env }, (err, stdout) => {
       childPids.delete(child.pid);
-      if (err) return resolve(null);
-      resolve(stdout.trim());
+      if (err) {
+        updaterLog('WARN', 'opencode --version failed:', err.message, '| stderr:', stderr.trim());
+        return resolve(null);
+      }
+      const ver = stdout.trim();
+      updaterLog('INFO', 'opencode --version output:', JSON.stringify(ver));
+      resolve(ver || null);
     });
     if (child.pid) childPids.add(child.pid);
+    if (child.stderr) child.stderr.on('data', (d) => { stderr += d.toString(); });
   });
 }
 
@@ -903,12 +949,39 @@ async function applyPendingUpdate() {
 
     fs.copyFileSync(extracted, destBin);
     if (process.platform !== 'win32') fs.chmodSync(destBin, 0o755);
+    // Remove macOS quarantine attribute so Gatekeeper won't kill unsigned binary
+    if (process.platform === 'darwin') {
+      try {
+        require('child_process').execFileSync('xattr', ['-d', 'com.apple.quarantine', destBin]);
+        updaterLog('INFO', 'Removed quarantine attribute from', destBin);
+      } catch (_) { /* attribute may not exist, ignore */ }
+    }
 
     // 7. Smoke test: run `opencode --version` to verify the new binary is executable
+    //    On Windows, antivirus (e.g. Defender) may lock newly written exe for scanning,
+    //    so we wait before the first attempt and retry a few times if it fails.
+    //    On macOS, Gatekeeper performs online notarization check on first execution of
+    //    a newly written binary, which can exceed the 5s timeout — add delay + retries.
+    const SMOKE_INITIAL_DELAY = process.platform === 'win32' ? 15000 : (process.platform === 'darwin' ? 2000 : 0);
+    const SMOKE_RETRY_COUNT   = process.platform === 'win32' ? 3 : (process.platform === 'darwin' ? 2 : 0);
+    const SMOKE_RETRY_INTERVAL = process.platform === 'win32' ? 5000 : 3000;
+
+    if (SMOKE_INITIAL_DELAY > 0) {
+      updaterLog('INFO', 'Waiting ' + (SMOKE_INITIAL_DELAY / 1000) + 's before smoke test (platform=' + process.platform + ')');
+      await new Promise(r => setTimeout(r, SMOKE_INITIAL_DELAY));
+    }
+
     updaterLog('INFO', 'Verifying new binary: running', destBin, '--version');
-    const newVer = await getOpencodeVersion();
+    let newVer = await getOpencodeVersion();
+
+    for (let attempt = 1; !newVer && attempt <= SMOKE_RETRY_COUNT; attempt++) {
+      updaterLog('WARN', 'Smoke test attempt ' + attempt + ' failed, retrying in ' + (SMOKE_RETRY_INTERVAL / 1000) + 's...');
+      await new Promise(r => setTimeout(r, SMOKE_RETRY_INTERVAL));
+      newVer = await getOpencodeVersion();
+    }
+
     if (!newVer) {
-      updaterLog('ERROR', 'New binary failed smoke test (opencode --version returned nothing), rolling back');
+      updaterLog('ERROR', 'New binary failed smoke test after all attempts, rolling back');
       // Rollback to backup
       try {
         if (fs.existsSync(backupPath)) {
@@ -924,6 +997,16 @@ async function applyPendingUpdate() {
     updaterLog('INFO', 'Smoke test passed: opencode --version =', newVer);
 
     updaterLog('INFO', 'Successfully updated opencode to v' + pendingVer);
+
+    // Clean up download directory after successful update
+    try {
+      const files = fs.readdirSync(DOWNLOAD_DIR);
+      for (const f of files) {
+        try { fs.unlinkSync(path.join(DOWNLOAD_DIR, f)); } catch (_) {}
+      }
+      updaterLog('INFO', 'Cleaned download directory (' + files.length + ' files)');
+    } catch (_) { /* best effort */ }
+
     return { applied: true, version: pendingVer };
   } catch (err) {
     updaterLog('ERROR', 'Update extraction failed:', err.message);
@@ -943,9 +1026,11 @@ async function applyPendingUpdate() {
   }
 }
 
-// NOTE: update-pending.json is NEVER deleted — it can only be overwritten
-// after a successful download + SHA256 verification in backgroundUpdateCheck().
-// download directory is also NEVER deleted — CDN flow naturally overwrites files.
+// NOTE: update-pending.json is NOT deleted after successful application —
+// version comparison prevents re-application. If a smoke test fails, the
+// pending entry is marked with smokeTestFailed=true to prevent retry loops.
+// backgroundUpdateCheck() overwrites it when a new version is available.
+// Download directory is cleaned after successful applyPendingUpdate().
 
 /**
  * Check if there's a pending update available (used internally by main.cjs).
