@@ -544,6 +544,63 @@ ipcMain.handle('lingeeBridge:dev-env-fetch', async (_event, opts) => {
   }
 });
 
+// ── 已签名的后端 API 代理（HMAC 在主进程完成，密钥不出主进程） ──
+ipcMain.handle('lingeeBridge:signed-backend-fetch', async (_event, url, options) => {
+  if (typeof url !== 'string' || !url) {
+    return { ok: false, status: 0, error: 'url is required' };
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch (err) {
+    return { ok: false, status: 0, error: `invalid url: ${err.message}` };
+  }
+
+  // 收集 query 参数，按 key 字典序去重（多值取第一个），与前端原签名逻辑等价
+  const queryParams = {};
+  const seen = new Set();
+  for (const k of Array.from(parsed.searchParams.keys()).sort()) {
+    if (seen.has(k)) continue;
+    seen.add(k);
+    queryParams[k] = parsed.searchParams.get(k) ?? '';
+  }
+
+  const timestamp = String(Date.now());
+  const signString = buildHmacSignString(queryParams, timestamp);
+  const sign = crypto.createHmac('sha256', MANAGE_HMAC_KEY).update(signString).digest('hex');
+
+  const method = (options && options.method) || 'GET';
+  const body = options && options.body;
+  const incomingHeaders = (options && options.headers) || {};
+  const headers = {
+    ...incomingHeaders,
+    'X-Manage-Sign': sign,
+    'X-Manage-Timestamp': timestamp,
+  };
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+    let resp, text;
+    try {
+      resp = await fetch(url, { method, headers, body, signal: controller.signal });
+      text = await resp.text();
+    } finally {
+      clearTimeout(timeout);
+    }
+    const respHeaders = {};
+    for (const key of ['content-type', 'x-request-id']) {
+      const v = resp.headers.get(key);
+      if (v) respHeaders[key] = v;
+    }
+    return { ok: resp.ok, status: resp.status, body: text, headers: respHeaders };
+  } catch (err) {
+    console.error('[LingeeBridge] signed-backend-fetch failed:', err.message);
+    return { ok: false, status: 0, error: err.message };
+  }
+});
+
 // 接收 webview 上报的业务事件
 const KNOWN_BRIDGE_EVENTS = new Set(['ready', 'token-expired', 'navigation', 'error']);
 ipcMain.handle('lingeeBridge:notify', (_event, eventName, data) => {

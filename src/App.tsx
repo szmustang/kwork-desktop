@@ -201,7 +201,7 @@ function App() {
     // 异步拉取完整用户信息并更新
     fetchAndMergeProfile(userInfo)
     // 登录埋点（fire-and-forget，不阻塞 UI）
-    trackUserLogin({ userId: userInfo.userId, tenantId: userInfo.tenantId })
+    trackUserLogin({ userId: userInfo.userId || '', tenantId: userInfo.tenantId || '' })
   }, [fetchAndMergeProfile])
 
   // 用 ref 追踪最新的 user/lang，避免 handleLogout 依赖它们导致频繁重建

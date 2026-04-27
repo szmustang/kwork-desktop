@@ -43,8 +43,11 @@ const DEVICE_ID_PATH = path.join(KCODE_DIR, 'device-id');
  */
 function getDeviceId() {
   try {
-    return fs.readFileSync(DEVICE_ID_PATH, 'utf-8').trim();
-  } catch (_) {
+    const existing = fs.readFileSync(DEVICE_ID_PATH, 'utf-8').trim();
+    if (existing) return existing;
+  } catch (_) { /* file not found, generate new */ }
+
+  try {
     const id = crypto.randomUUID();
     try {
       fs.mkdirSync(KCODE_DIR, { recursive: true });
@@ -53,6 +56,9 @@ function getDeviceId() {
       console.error('[Tracking] write device-id failed:', err.message);
     }
     return id;
+  } catch (err) {
+    console.error('[Tracking] getDeviceId failed:', err.message);
+    return '';
   }
 }
 
@@ -61,35 +67,74 @@ function getDeviceId() {
  * @returns {{ os: string, os_version: string, os_arch: string }}
  */
 function getOsInfo() {
-  const platform = os.platform();
-  let osName;
-  if (platform === 'darwin') osName = 'mac';
-  else if (platform === 'win32') osName = 'windows';
-  else osName = 'linux';
+  try {
+    const platform = os.platform();
+    let osName;
+    if (platform === 'darwin') osName = 'mac';
+    else if (platform === 'win32') osName = 'windows';
+    else osName = 'linux';
 
-  let osVersion;
-  if (platform === 'darwin') {
-    // os.release() returns Darwin kernel version, e.g. '23.4.0' → macOS 14.4
-    osVersion = `macOS ${os.release()}`;
-  } else {
-    osVersion = `${os.type()} ${os.release()}`;
+    // 优先使用 Electron process.getSystemVersion() 获取真实系统版本：
+    //   macOS  → '14.4.1'
+    //   Windows → '10.0.22631'
+    // 若不可用则降级到 os.release()（Darwin 内核版本，如 '23.4.0'）。
+    // 注：process.getSystemVersion() 是 Electron 对 Node 原生 process 的扩展，仅在主进程可用。
+    let systemVersion = '';
+    try {
+      if (typeof process.getSystemVersion === 'function') {
+        systemVersion = process.getSystemVersion() || '';
+      }
+    } catch (_) { /* ignore, fallback below */ }
+    if (!systemVersion) systemVersion = os.release();
+
+    let osVersion;
+    if (platform === 'darwin') {
+      // macOS: process.getSystemVersion() 返回 '14.4.1' 这样的真实版本
+      osVersion = `macOS ${systemVersion}`;
+    } else if (platform === 'win32') {
+      // Windows: GetVersion 对外始终返回 '10.0.xxxxx'，Windows 11 和 Windows 10 无法通过主次版本区分，
+      // 需要根据 build 号判断：build ≥ 22000 即为 Windows 11。
+      const match = /^10\.0\.(\d+)/.exec(systemVersion);
+      const build = match ? parseInt(match[1], 10) : 0;
+      let winMajor = '';
+      if (build >= 22000) winMajor = '11';
+      else if (build > 0) winMajor = '10';
+      osVersion = winMajor
+        ? `Windows ${winMajor} (${systemVersion})`
+        : `Windows ${systemVersion}`;
+    } else {
+      osVersion = `${os.type()} ${systemVersion}`;
+    }
+
+    return { os: osName, os_version: osVersion, os_arch: os.arch() };
+  } catch (err) {
+    console.error('[Tracking] getOsInfo failed:', err.message);
+    return { os: '', os_version: '', os_arch: '' };
   }
-
-  return { os: osName, os_version: osVersion, os_arch: os.arch() };
 }
 
 /**
  * @returns {string} 应用版本号
  */
 function getAppVersion() {
-  return app.getVersion();
+  try {
+    return app.getVersion() || '';
+  } catch (err) {
+    console.error('[Tracking] getAppVersion failed:', err.message);
+    return '';
+  }
 }
 
 /**
  * @returns {string} 代码版本号（一阶段与 app_version 相同）
  */
 function getCodeVersion() {
-  return app.getVersion();
+  try {
+    return app.getVersion() || '';
+  } catch (err) {
+    console.error('[Tracking] getCodeVersion failed:', err.message);
+    return '';
+  }
 }
 
 // ── 哈希 ──
@@ -100,7 +145,13 @@ function getCodeVersion() {
  * @returns {string}
  */
 function hashField(value) {
-  return crypto.createHash('sha256').update(String(value)).digest('hex');
+  if (value === undefined || value === null || value === '') return '';
+  try {
+    return crypto.createHash('sha256').update(String(value)).digest('hex');
+  } catch (err) {
+    console.error('[Tracking] hashField failed:', err.message);
+    return '';
+  }
 }
 
 // ── 构建载荷 ──
@@ -114,26 +165,29 @@ function buildPayload(eventData) {
   const osInfo = getOsInfo();
   const deviceId = getDeviceId();
 
+  const userId = eventData.user_id || '';
+  const tenantId = eventData.tenant_id || '';
+
   const payload = {
-    event_name: eventData.event_name,
-    event_time: eventData.event_time,
-    user_id: hashField(eventData.user_id || ''),
-    tenant_id: eventData.tenant_id || '',
+    event_name: eventData.event_name || '',
+    event_time: eventData.event_time || Date.now(),
+    user_id: userId,
+    tenant_id: tenantId,
     var: {
       ...(eventData.var || {}),
-      device_id: hashField(deviceId),
-      os: osInfo.os,
-      os_version: osInfo.os_version,
-      os_arch: osInfo.os_arch,
+      device_id: deviceId,
+      os: osInfo.os || '',
+      os_version: osInfo.os_version || '',
+      os_arch: osInfo.os_arch || '',
       app_version: getAppVersion(),
       code_version: getCodeVersion(),
     },
   };
 
-  // 保留渲染进程传入的 source
-  if (eventData.var && eventData.var.source !== undefined) {
-    payload.var.source = eventData.var.source;
-  }
+  // 保留渲染进程传入的 source，取不到时默认空字符串
+  payload.var.source = (eventData.var && eventData.var.source !== undefined)
+    ? eventData.var.source
+    : '';
 
   return payload;
 }
