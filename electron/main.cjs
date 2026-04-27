@@ -128,17 +128,25 @@ function broadcastToWebviews(channel, ...args) {
 
 function createWindow() {
   const isWin = process.platform === 'win32';
+
+  // 用屏幕工作区尺寸创建窗口，使页面从一开始就按接近全屏的尺寸渲染，
+  // 避免 did-finish-load 时 maximize() 触发布局跳动
+  const { screen } = require('electron');
+  const workArea = screen.getPrimaryDisplay().workArea;
+
   mainWindow = new BrowserWindow({
     title: '',
-    width: 1200,
-    height: 800,
+    width: workArea.width,
+    height: workArea.height,
+    x: workArea.x,
+    y: workArea.y,
     minWidth: 900,
     minHeight: 600,
     titleBarStyle: 'hidden',
     titleBarOverlay: isWin ? { color: '#00000000', symbolColor: '#666666', height: 40 } : undefined,
     trafficLightPosition: { x: 12, y: 12 },
     backgroundColor: '#ffffff',
-    show: false, // 延迟显示窗口，避免 Windows 下启动白屏闪烁
+    show: false, // 延迟显示窗口，避免启动白屏闪烁
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -148,7 +156,7 @@ function createWindow() {
     },
   });
 
-  // 页面加载完成后再显示并最大化窗口，避免启动白屏闪烁
+  // 页面加载完成后最大化并显示窗口
   let windowShown = false;
   const showWindow = () => {
     if (windowShown || !mainWindow || mainWindow.isDestroyed()) return;
