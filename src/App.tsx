@@ -37,6 +37,26 @@ type TabKey = 'chat' | 'work' | 'dev'
 
 const tabKeys: TabKey[] = ['chat', 'work', 'dev']
 
+/* ── 顶部页签导航（纯 CSS 滑块动画，零 DOM 操作） ── */
+function TabNav({ activeTab, lang, onTabChange }: { activeTab: TabKey; lang: Lang; onTabChange: (k: TabKey) => void }) {
+  const tabIndex = tabKeys.indexOf(activeTab)
+
+  return (
+    <nav className="topbar-tabs">
+      <div className="tab-slider" style={{ transform: `translate3d(${tabIndex * 100}%, 0, 0)` }} />
+      {tabKeys.map((key) => (
+        <button
+          key={key}
+          className={`tab-btn ${activeTab === key ? 'active' : ''}`}
+          onClick={() => onTabChange(key)}
+        >
+          {t(lang, key === 'chat' ? 'tabChat' : key === 'work' ? 'tabWork' : 'tabDev')}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
 /* ── 左下角更新提示弹窗 ── */
 
 function UpdateToast({ lang }: { lang: Lang }) {
@@ -92,7 +112,7 @@ function UpdateToast({ lang }: { lang: Lang }) {
 
   if (!updateInfo) return null
 
-  const titleText = `${t(lang, 'updateUpdatedTo')}V${updateInfo.version}`
+  const titleText = `${t(lang, 'updateUpdatedTo')} V${updateInfo.version}`
 
   return (
     <div className="update-toast">
@@ -336,17 +356,7 @@ function App() {
                                     <span className="logo-text"></span>
                 </div>
 
-        <nav className="topbar-tabs">
-          {tabKeys.map((key) => (
-            <button
-              key={key}
-              className={`tab-btn ${activeTab === key ? 'active' : ''}`}
-              onClick={() => setActiveTab(key)}
-            >
-              {t(lang, key === 'chat' ? 'tabChat' : key === 'work' ? 'tabWork' : 'tabDev')}
-            </button>
-          ))}
-        </nav>
+        <TabNav activeTab={activeTab} lang={lang} onTabChange={setActiveTab} />
 
         <div className="topbar-right">
           <UserDropdown user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} appVersion={appVersion} appName={appName} externalShowAbout={triggerAbout} onAboutClosed={() => setTriggerAbout(false)} lang={lang} onLangChange={handleLangChange} />
