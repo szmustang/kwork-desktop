@@ -22,6 +22,7 @@ const messages = {
     updateUpdatedTo: '已更新至',
     updateRelaunchHint: '重启以应用更新',
     updateRelaunch: '重启',
+    updateSkip: '跳过',
     // user dropdown
     fileTitle: '文件',
     notifyTitle: '通知',
@@ -90,6 +91,7 @@ const messages = {
     updateUpdatedTo: 'Updated to',
     updateRelaunchHint: 'Relaunch to apply',
     updateRelaunch: 'Relaunch',
+    updateSkip: 'Skip',
     // user dropdown
     fileTitle: 'Files',
     notifyTitle: 'Notifications',

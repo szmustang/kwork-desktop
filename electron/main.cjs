@@ -661,8 +661,8 @@ autoUpdater.forceDevUpdateConfig = true;
 // 禁用自动下载，由 update-available 事件手动触发静默下载
 autoUpdater.autoDownload = false;
 
-// 禁用退出时自动安装，由用户确认后手动触发
-autoUpdater.autoInstallOnAppQuit = false;
+// 退出时自动安装已下载的更新包，用户跳过后下次启动即为新版本
+autoUpdater.autoInstallOnAppQuit = true;
 
 // 自动更新事件监听
 autoUpdater.on('checking-for-update', () => {

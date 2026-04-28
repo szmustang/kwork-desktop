@@ -37,7 +37,7 @@ type TabKey = 'chat' | 'work' | 'dev'
 
 const tabKeys: TabKey[] = ['chat', 'work', 'dev']
 
-/* ── 右下角更新提示弹窗 ── */
+/* ── 左下角更新提示弹窗 ── */
 
 function UpdateToast({ lang }: { lang: Lang }) {
   const [updateInfo, setUpdateInfo] = useState<{ version: string; type: 'opencode' | 'client' } | null>(null)
@@ -86,28 +86,31 @@ function UpdateToast({ lang }: { lang: Lang }) {
     }
   }
 
+  const handleDismiss = () => {
+    setUpdateInfo(null)
+  }
+
   if (!updateInfo) return null
 
-  const isOpencode = updateInfo.type === 'opencode'
+  const titleText = `${t(lang, 'updateUpdatedTo')}V${updateInfo.version}`
 
   return (
     <div className="update-toast">
-      <div className="update-toast-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
-          <path d="M24 4C23.2 4.8 16 12.4 16 20C16 24.4 19.6 28 24 28C28.4 28 32 24.4 32 20C32 12.4 24.8 4.8 24 4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-          <path d="M24 28V44" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          <path d="M18 36H30" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          <path d="M20 40H28" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-        </svg>
-      </div>
-      <div className="update-toast-text">
-        <strong>{t(lang, isOpencode ? 'updateBuild' : 'updateClient')} {t(lang, 'updateUpdatedTo')} {updateInfo.version}</strong>
-        <p>{t(lang, 'updateRelaunchHint')}</p>
-      </div>
-      <div className="update-toast-actions">
-        <button className="update-toast-btn" onClick={handleUpdate}>
-          {t(lang, 'updateRelaunch')}
+      <div className="update-toast-header">
+        <div className="update-toast-title" title={titleText}>
+          <span className="update-toast-title-label">{t(lang, 'updateUpdatedTo')}</span>
+          <span className="update-toast-title-version">V{updateInfo.version}</span>
+        </div>
+        <button className="update-toast-close" onClick={handleDismiss} title={t(lang, 'updateSkip')}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 8 8" fill="none">
+            <path fillRule="evenodd" clipRule="evenodd" d="M0.195262 0.195262C0.455612 -0.0650874 0.877722 -0.0650874 1.13807 0.195262L4 3.05719L6.86193 0.195262C7.12228 -0.0650874 7.54439 -0.0650874 7.80474 0.195262C8.06509 0.455612 8.06509 0.877722 7.80474 1.13807L4.94281 4L7.80474 6.86193C8.06509 7.12228 8.06509 7.54439 7.80474 7.80474C7.54439 8.06509 7.12228 8.06509 6.86193 7.80474L4 4.94281L1.13807 7.80474C0.877722 8.06509 0.455612 8.06509 0.195262 7.80474C-0.0650874 7.54439 -0.0650874 7.12228 0.195262 6.86193L3.05719 4L0.195262 1.13807C-0.0650874 0.877722 -0.0650874 0.455612 0.195262 0.195262Z" fill="currentColor"/>
+          </svg>
         </button>
+      </div>
+      <p className="update-toast-hint" title={t(lang, 'updateRelaunchHint')}>{t(lang, 'updateRelaunchHint')}</p>
+      <div className="update-toast-actions">
+        <span className="update-toast-skip" onClick={handleDismiss} title={t(lang, 'updateSkip')}>{t(lang, 'updateSkip')}</span>
+        <button className="update-toast-restart-btn" onClick={handleUpdate} title={t(lang, 'updateRelaunch')}>{t(lang, 'updateRelaunch')}</button>
       </div>
     </div>
   )
