@@ -141,6 +141,9 @@ function broadcastToWebviews(channel, ...args) {
 
 function createWindow() {
   const isWin = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
+  // Windows 11 Build 22621+ 才支持 backgroundMaterial: 'acrylic'
+  const isWin11 = isWin && parseInt((require('os').release().split('.')[2]) || '0') >= 22000;
 
   // 用屏幕工作区尺寸创建窗口，使页面从一开始就按接近全屏的尺寸渲染，
   // 避免 did-finish-load 时 maximize() 触发布局跳动
@@ -158,7 +161,11 @@ function createWindow() {
     titleBarStyle: 'hidden',
     titleBarOverlay: isWin ? { color: '#00000000', symbolColor: '#666666', height: 40 } : undefined,
     trafficLightPosition: { x: 12, y: 12 },
-    backgroundColor: '#ffffff',
+    transparent: isMac, // macOS: 启用原生透明，vibrancy 才能透出桌面
+    backgroundColor: isMac ? undefined : (isWin11 ? '#00000001' : '#ffffff'),
+    vibrancy: isMac ? 'under-window' : undefined,
+    visualEffectState: isMac ? 'active' : undefined,
+    backgroundMaterial: isWin11 ? 'acrylic' : undefined, // Windows 11: 原生亚克力毛玻璃
     show: false, // 延迟显示窗口，避免启动白屏闪烁
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -174,7 +181,11 @@ function createWindow() {
   const showWindow = () => {
     if (windowShown || !mainWindow || mainWindow.isDestroyed()) return;
     windowShown = true;
-    mainWindow.maximize();
+    // macOS: 不调用 maximize()，因为它会破坏 transparent 窗口的透明效果
+    // 窗口已按 workArea 尺寸创建，视觉上等同于最大化
+    if (!isMac) {
+      mainWindow.maximize();
+    }
     mainWindow.show();
     mainWindow.focus();
     if (process.platform === 'darwin') {
@@ -187,6 +198,32 @@ function createWindow() {
 
   // macOS: 点红色关闭按钮只隐藏窗口，不销毁，保留页面状态
   if (process.platform === 'darwin') {
+    // 修复窗口大小变化后 vibrancy/透明失效的已知 Electron bug
+    // 需先置空再延迟恢复，给 Chromium 完成布局重排的时间
+    const reapplyVibrancy = () => {
+      if (mainWindow.isDestroyed()) return;
+      mainWindow.setVibrancy(null);
+      setTimeout(() => {
+        if (!mainWindow.isDestroyed()) mainWindow.setVibrancy('under-window');
+      }, 50);
+    };
+    mainWindow.on('resize', reapplyVibrancy);
+    mainWindow.webContents.on('devtools-closed', reapplyVibrancy);
+
+    // macOS transparent 窗口 + docked DevTools 会破坏 vibrancy（Electron 已知限制）
+    // 强制 DevTools 以独立窗口打开，避免影响主窗口的毛玻璃效果
+    mainWindow.webContents.on('before-input-event', (_event, input) => {
+      // 拦截 Cmd+Opt+I（macOS 默认 DevTools 快捷键）
+      if (input.meta && input.alt && input.key.toLowerCase() === 'i' && input.type === 'keyDown') {
+        _event.preventDefault();
+        if (mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.closeDevTools();
+        } else {
+          mainWindow.webContents.openDevTools({ mode: 'detach' });
+        }
+      }
+    });
+
     mainWindow.on('close', (e) => {
       if (!forceQuit) {
         e.preventDefault();

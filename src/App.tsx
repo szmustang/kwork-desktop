@@ -160,6 +160,10 @@ function App() {
     if (bridge?.platform) {
       document.documentElement.setAttribute('data-platform', bridge.platform)
     }
+    // 标记是否支持原生毛玻璃效果（macOS vibrancy / Windows 11 acrylic）
+    if (bridge?.vibrancy) {
+      document.documentElement.setAttribute('data-vibrancy', 'true')
+    }
     return () => { cleanupAbout?.() }
   }, [])
 

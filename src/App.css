@@ -69,7 +69,13 @@ body {
   height: 100vh;
   width: 100vw;
   position: relative;
-  background: url('./assets/home-bg.jpg') no-repeat center center / cover;
+  /* background: url('./assets/home-bg.jpg') no-repeat center center / cover; */
+  background:
+    radial-gradient(900px at 35% 70%, rgba(149, 255, 250, 0.7) 0%, rgba(149, 255, 250, 0) 100%),
+    radial-gradient(1000px at 70% 55%, rgba(142, 178, 255, 1) 0%, rgba(142, 178, 255, 0) 100%),
+    radial-gradient(800px at 92% 18%, rgba(207, 175, 255, 1) 0%, rgba(207, 175, 255, 0) 100%),
+    radial-gradient(600px at 0% 18%, rgba(255, 204, 193, 1) 0%, rgba(255, 204, 193, 0) 100%),
+    #ffffff;
 }
 
 .app::before {
@@ -89,6 +95,43 @@ body {
 
 [data-theme="dark"] .app {
   background: var(--bg-primary);
+}
+
+/* ===== 原生毛玻璃: macOS vibrancy / Windows 11 acrylic ===== */
+/* 仅在支持 vibrancy 的系统上启用透明，让原生模糊效果透出 */
+[data-vibrancy] {
+  background: transparent;
+}
+
+[data-vibrancy] body {
+  background: transparent;
+}
+
+[data-vibrancy] .app {
+  background: transparent;
+}
+
+[data-vibrancy] .app::before {
+  display: none;
+}
+
+[data-vibrancy][data-theme="dark"] .app {
+  background: transparent;
+}
+
+/* 暗色主题: topbar 半透明深色叠加 */
+[data-vibrancy][data-theme="dark"] .topbar {
+  background: rgba(22, 27, 34, 0.7);
+}
+
+/* 浅色主题: 在 .app 层叠加半透明白色，统一 topbar 和圆角间隙的颜色 */
+[data-vibrancy][data-theme="light"] .app {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+/* 不支持 vibrancy 的系统（如 Windows 10）: topbar 使用实色 */
+[data-platform]:not([data-vibrancy]) .topbar {
+  background: #ededec;
 }
 
 /* ===== 顶部导航栏 ===== */

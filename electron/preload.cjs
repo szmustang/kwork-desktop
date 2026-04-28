@@ -4,6 +4,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 // 所有能力（应用管理、认证、配置同步、文件系统、自动更新等）统一挂载在 lingeeBridge 上
 contextBridge.exposeInMainWorld('lingeeBridge', {
   platform: process.platform,
+  // macOS 全版本支持 vibrancy；Windows 11 Build 22000+ 支持 backgroundMaterial
+  vibrancy: process.platform === 'darwin' ||
+    (process.platform === 'win32' && parseInt((require('os').release().split('.')[2]) || '0') >= 22000),
 
   // ── 应用信息与控制 ──
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
