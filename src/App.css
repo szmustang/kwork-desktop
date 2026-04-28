@@ -69,12 +69,7 @@ body {
   height: 100vh;
   width: 100vw;
   position: relative;
-  background:
-    radial-gradient(900px at 35% 70%, rgba(149, 255, 250, 0.7) 0%, rgba(149, 255, 250, 0) 100%),
-    radial-gradient(1000px at 70% 55%, rgba(142, 178, 255, 1) 0%, rgba(142, 178, 255, 0) 100%),
-    radial-gradient(800px at 92% 18%, rgba(207, 175, 255, 1) 0%, rgba(207, 175, 255, 0) 100%),
-    radial-gradient(600px at 0% 18%, rgba(255, 204, 193, 1) 0%, rgba(255, 204, 193, 0) 100%),
-    #ffffff;
+  background: url('./assets/home-bg.jpg') no-repeat center center / cover;
 }
 
 .app::before {
@@ -341,17 +336,6 @@ body {
   border-radius: 60px;
   object-fit: cover;
   flex-shrink: 0;
-}
-
-.user-avatar-status {
-  width: 6px;
-  height: 6px;
-  position: absolute;
-  right: 0.6px;
-  bottom: 0.6px;
-  border-radius: 73.8px;
-  border: 0.9px solid var(--Neutral-Colors-0, #FFF);
-  background: var(--Secondary-Colors-Green-500, #34C759);
 }
 
 .user-dropdown-panel {

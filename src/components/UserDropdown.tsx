@@ -91,7 +91,6 @@ export default function UserDropdown({ user, onLogout, theme, onToggleTheme, app
         onClick={() => setOpen(!open)}
       >
         <img src={avatarSrc} alt={initials} className="user-avatar-img" />
-        <span className="user-avatar-status" />
       </div>
 
       {/* 下拉面板 */}
