@@ -45,6 +45,8 @@ function clientUpdateLog(level, ...args) {
 }
 let forceQuit = false;
 
+// baseUrl 变更后需要清除渲染进程 localStorage（须等 app ready 后执行）
+let needClearRendererStorage = false;
 
 // ── LingeeBridge 配置状态 ──
 // 由渲染进程推送，主进程作为 webview 配置的单一数据源
@@ -69,6 +71,7 @@ function persistBridgeConfig() {
     const payload = {
       auth: currentBridgeConfig.auth || null,
       language: currentBridgeConfig.language || 'zh-CN',
+      baseUrl: LINGEE_BASE_URL,
     };
     fs.writeFile(BRIDGE_PERSIST_FILE, JSON.stringify(payload), 'utf-8', (err) => {
       if (err) console.warn('[BridgePersist] write failed:', err.message);
@@ -103,6 +106,16 @@ function restoreBridgeConfig() {
       } else {
         currentBridgeConfig.auth = auth;
       }
+    }
+
+    // baseUrl 变更检测：环境切换或旧版本升级时自动清除旧 auth，避免旧 token 在新环境上报错
+    // data.baseUrl 为 undefined（旧版本无此字段）或与当前不同，均视为环境变更
+    if (data.baseUrl !== LINGEE_BASE_URL) {
+      console.warn(`[BridgePersist] baseUrl changed: ${data.baseUrl || '(none)'} → ${LINGEE_BASE_URL}, clearing auth`);
+      currentBridgeConfig.auth = null;
+      needClearRendererStorage = true;
+      // 立即持久化：写入新 baseUrl 并清除 auth
+      persistBridgeConfig();
     }
   } catch (err) {
     console.warn('[BridgePersist] restore failed:', err.message);
@@ -809,6 +822,18 @@ function stopClientBackgroundCheck() {
 app.whenReady().then(async () => {
   // Pre-resolve login-shell environment early (macOS GUI apps lack full PATH)
   resolveShellEnv().catch(() => {});
+
+  // baseUrl 变更时清除渲染进程 localStorage（session API 须在 app ready 后调用）
+  if (needClearRendererStorage) {
+    try {
+      const { session } = require('electron');
+      await session.defaultSession.clearStorageData({ storages: ['localstorage'] });
+      console.log('[BridgePersist] Renderer localStorage cleared due to baseUrl change');
+    } catch (err) {
+      console.warn('[BridgePersist] Failed to clear renderer storage:', err.message);
+    }
+    needClearRendererStorage = false;
+  }
 
   // 初始化 bridge config 的 hostVersion
   currentBridgeConfig.hostVersion = app.getVersion();

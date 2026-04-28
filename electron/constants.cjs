@@ -4,7 +4,7 @@
  * Electron 主进程侧常量，与 src/constants.ts 保持一致。
  * 切换环境时两处需同时修改。
  */
-const LINGEE_BASE_URL = 'https://devtest.kingdee.com';
+const LINGEE_BASE_URL = 'https://itkworkuat.kingdee.com';
 
 // ---- 埋点配置 ----
 const TRACKING_API_URL = 'https://bj2-api.kingdee.com/laddercs/ladderlog'
