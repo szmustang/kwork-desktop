@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog, shell, clipboard, webContents } = require('electron');
+const { app, BrowserWindow, ipcMain, nativeTheme, Menu, nativeImage, dialog, shell, clipboard, webContents, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -209,6 +209,24 @@ function createWindow() {
         }
       }
     }
+  });
+
+  // ── 宿主恢复活跃 → 广播到所有 webview ──
+  // SPA 方监听 onHostResume 事件进行版本检查、重建长连接等恢复操作
+
+  // 事件1: 窗口获得焦点（用户切回应用）
+  mainWindow.on('focus', () => {
+    broadcastToWebviews('lingeeBridge:host-resume', 'window-focus');
+  });
+
+  // 事件2: 系统从睡眠中唤醒
+  powerMonitor.on('resume', () => {
+    broadcastToWebviews('lingeeBridge:host-resume', 'system-resume');
+  });
+
+  // 事件3: 用户解锁屏幕
+  powerMonitor.on('unlock-screen', () => {
+    broadcastToWebviews('lingeeBridge:host-resume', 'screen-unlocked');
   });
 
   if (devServerURL) {

@@ -15,6 +15,7 @@ let _config = ipcRenderer.sendSync('lingeeBridge:get-config');
 // 回调注册表
 const _configCallbacks = new Set();
 const _stopCallbacks = new Set();
+const _hostResumeCallbacks = new Set();
 
 // ── 宿主推送监听 ──
 
@@ -37,6 +38,17 @@ ipcRenderer.on('lingeeBridge:stop-requested', () => {
       cb();
     } catch (e) {
       console.error('[LingeeBridge] onStopRequested callback error:', e);
+    }
+  }
+});
+
+// 宿主恢复活跃推送（focus / resume / unlock-screen）
+ipcRenderer.on('lingeeBridge:host-resume', (_event, reason) => {
+  for (const cb of _hostResumeCallbacks) {
+    try {
+      cb(reason);
+    } catch (e) {
+      console.error('[LingeeBridge] onHostResume callback error:', e);
     }
   }
 });
@@ -79,5 +91,11 @@ contextBridge.exposeInMainWorld('lingeeBridge', {
   onStopRequested: (callback) => {
     _stopCallbacks.add(callback);
     return () => _stopCallbacks.delete(callback);
+  },
+
+  // 宿主恢复活跃监听（focus / resume / unlock-screen），SPA 方据此触发版本检查
+  onHostResume: (callback) => {
+    _hostResumeCallbacks.add(callback);
+    return () => _hostResumeCallbacks.delete(callback);
   },
 });
