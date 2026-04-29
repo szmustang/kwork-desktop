@@ -16,6 +16,14 @@ contextBridge.exposeInMainWorld('lingeeBridge', {
   relaunchApp: () => ipcRenderer.invoke('relaunch-app'),
   toggleDevTools: () => ipcRenderer.invoke('toggle-devtools'),
 
+  // ── 窗口圆角状态（仅 macOS 有效：非最大化且非全屏时为 true）──
+  getWindowRoundedState: () => ipcRenderer.invoke('get-window-rounded-state'),
+  onWindowRoundedStateChange: (cb) => {
+    const listener = (_event, rounded) => cb(!!rounded);
+    ipcRenderer.on('window-rounded-state', listener);
+    return () => ipcRenderer.removeListener('window-rounded-state', listener);
+  },
+
   // ── 文件系统 ──
   selectFolder: (options) => ipcRenderer.invoke('select-folder', options),
   openPath: (targetPath) => ipcRenderer.invoke('open-path', targetPath),

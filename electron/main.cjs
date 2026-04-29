@@ -141,24 +141,37 @@ function broadcastToWebviews(channel, ...args) {
 
 function createWindow() {
   const isWin = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
 
-  // 用屏幕工作区尺寸创建窗口，使页面从一开始就按接近全屏的尺寸渲染，
-  // 避免 did-finish-load 时 maximize() 触发布局跳动
+  // 用屏幕工作区尺寸减去外边距来初始化浮动窗口，避免被系统标记为最大化
+  // 状态（最大化会触发 macOS 的 rounded=false，使 48px 圆角丢失）。
   const { screen } = require('electron');
   const workArea = screen.getPrimaryDisplay().workArea;
+  const isMacPlatform = process.platform === 'darwin';
+  // macOS 下为浮动窗口留出四周边距，四角圆角才能完整曝露；Windows 按旧行为充满工作区。
+  const margin = isMacPlatform ? 80 : 0;
+  const initialWidth = Math.max(900, workArea.width - margin * 2);
+  const initialHeight = Math.max(600, workArea.height - margin * 2);
 
   mainWindow = new BrowserWindow({
     title: '',
-    width: workArea.width,
-    height: workArea.height,
-    x: workArea.x,
-    y: workArea.y,
+    width: initialWidth,
+    height: initialHeight,
+    x: workArea.x + Math.floor((workArea.width - initialWidth) / 2),
+    y: workArea.y + Math.floor((workArea.height - initialHeight) / 2),
     minWidth: 900,
     minHeight: 600,
     titleBarStyle: 'hidden',
     titleBarOverlay: isWin ? { color: '#00000000', symbolColor: '#666666', height: 40 } : undefined,
     trafficLightPosition: { x: 12, y: 12 },
-    backgroundColor: '#ffffff',
+    // macOS 开启透明窗口，配合渲染层的 border-radius 实现整窗自定义圆角（仅在非最大化/非全屏状态下有效）。
+    // Windows 继续使用不透明的矩形窗口，保留系统 Aero 阴影与传统外观。
+    transparent: isMac,
+    // macOS 下关闭 NSWindow 系统阴影：系统阴影按矩形 frame 绘制，
+    // 会在 CSS 圆角外的四角曝光为白色 L 形块。阴影改由 CSS box-shadow
+    // 在 .app 上绘制，始终沿圆角轮廓。Windows 保留系统 Aero 阴影。
+    hasShadow: !isMac,
+    backgroundColor: isMac ? '#00000000' : '#ffffff',
     show: false, // 延迟显示窗口，避免启动白屏闪烁
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -169,12 +182,16 @@ function createWindow() {
     },
   });
 
-  // 页面加载完成后最大化并显示窗口
+  // 页面加载完成后显示窗口。
+  // macOS 保持浮动窗口、不自动最大化，保证整窗 48px 圆角始终可见；
+  // Windows 维持原行为即启动即最大化。
   let windowShown = false;
   const showWindow = () => {
     if (windowShown || !mainWindow || mainWindow.isDestroyed()) return;
     windowShown = true;
-    mainWindow.maximize();
+    if (!isMacPlatform) {
+      mainWindow.maximize();
+    }
     mainWindow.show();
     mainWindow.focus();
     if (process.platform === 'darwin') {
@@ -211,6 +228,19 @@ function createWindow() {
     }
   });
 
+  // 向渲染进程广播窗口的全屏状态变化，供前端按需切换整窗圆角。
+  // 注意：MacPaw 类 “无边际圆角” 视觉规范下，最大化仍保留圆角，仅全屏时恢复直角。
+  const sendMaxState = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const rounded = !mainWindow.isFullScreen();
+    mainWindow.webContents.send('window-rounded-state', rounded);
+  };
+  mainWindow.on('maximize', sendMaxState);
+  mainWindow.on('unmaximize', sendMaxState);
+  mainWindow.on('enter-full-screen', sendMaxState);
+  mainWindow.on('leave-full-screen', sendMaxState);
+  mainWindow.webContents.on('did-finish-load', sendMaxState);
+
   if (devServerURL) {
     mainWindow.loadURL(devServerURL);
   } else {
@@ -229,6 +259,12 @@ function createWindow() {
 // IPC handlers
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
+});
+
+// 渲染进程查询当前窗口是否处于可圆角状态（仅全屏时恢复直角）。
+ipcMain.handle('get-window-rounded-state', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  return !mainWindow.isFullScreen();
 });
 
 ipcMain.handle('get-app-name', () => {

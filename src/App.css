@@ -57,9 +57,116 @@ html, body, #root {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
-  background: var(--bg-primary);
+  /* 保持 transparent：macOS 下 BrowserWindow 为 transparent，body 若有实色底色
+   * 会从 #root 的 32px 圆角外漏出（index.html 已同步去掉 body inline background）；
+   * 底色由 .app / .login-page 自行提供，Windows 侧窗口不透明+BrowserWindow.backgroundColor
+   * 托底，视觉一致。*/
+  background: transparent;
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ===== macOS 整窗 32px 圆角（MacPaw 风格） =====
+ * 主进程：BrowserWindow transparent=true + hasShadow=false（替代为 CSS box-shadow）。
+ * 外轮廓两层（#root / .app）只用 border-radius + overflow + -electron-corner-smoothing：
+ *   → clip-path 是矢量硬边裁剪（无抗锯齿），一旦上外轮廓，会盖掉
+ *     border-radius 的半透明抗锯齿像素 + smoothing 的 squircle 曲线 → 视觉有毛边。
+ *   → 外轮廓只需裁 DOM 层子树，border-radius + overflow 对普通 DOM、backdrop-filter
+ *     合成层（Chromium 113+）已完全够用，并且自带边缘抗锯齿。
+ * 合成层兜底（仅在真正必要处保留 clip-path）：
+ *   → .main-content：<webview> OOPIF 只能用 clip-path 裁。
+ *   → .login-video-bg：<video> overlay 用 filter: brightness(1) 降级 + border-radius 裁。*/
+[data-platform="darwin"] #root {
+  border-radius: 32px;
+  /* Electron 36+ 原生 squircle 平滑圆角（苹果风格），同时显著降低边缘锯齿感。*/
+  -electron-corner-smoothing: 60%;
+  overflow: hidden;
+}
+
+[data-platform="darwin"] .app {
+  border-radius: 32px;
+  -electron-corner-smoothing: 60%;
+  overflow: hidden;
+  isolation: isolate;
+  position: relative;
+  /* 替代关闭的 NSWindow 系统阴影，沿圆角轮廓绘制软阴影。
+   * hairline 描边改由 .app::after 绘制，避免被 .main-content 白底覆盖。*/
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 12px 48px rgba(0, 0, 0, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* 主界面 32px 圆角 hairline：外层深灰 1px + 内层半透白 1px，
+ * z-index 需高于所有子元素（main-content / webview / topbar）。*/
+[data-platform="darwin"] .app::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 32px;
+  -electron-corner-smoothing: 60%;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.18),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+  z-index: 100;
+}
+
+[data-platform="darwin"][data-rounded="false"] .app::after {
+  display: none;
+}
+
+/* 主内容区承载 <webview>，单独对顶部两角做 clip-path，保证 webview 合成层被裁剪。*/
+[data-platform="darwin"] .main-content {
+  border-radius: 32px 32px 0 0;
+  -electron-corner-smoothing: 60%;
+  clip-path: inset(0 round 32px 32px 0 0);
+  /* 强制提升为独立合成层，clip-path 才会在合成器层级应用到 webview OOPIF。*/
+  transform: translateZ(0);
+  isolation: isolate;
+}
+
+/* <webview> 本身是 GuestView/OOPIF，祖先的 overflow/clip-path 在部分
+ * Chromium 版本上会被穿透，最靠谱的做法是直接给 webview 本身
+ * 加 border-radius，让它自己的合成层去裁边。*/
+[data-platform="darwin"] .tab-content webview,
+[data-platform="darwin"] .dt-container webview {
+  border-radius: 32px 32px 0 0;
+  -electron-corner-smoothing: 60%;
+  overflow: hidden;
+}
+
+/* 登录页的 <video> 背景与 webview 一样是独立合成层（Chromium video overlay），
+ * 在 macOS 上 Chromium 会把 video 走 IOSurface 硬件 overlay 路径，
+ * 直接 bypass CSS（无论是祖先的 clip-path 还是 video 自己的
+ * border-radius / clip-path，都裁不住），video 会漫到四角 32px 圆角外。
+ * 解法：给 video 加 filter: brightness(1)——这个零副作用的 CSS hack
+ * 会强制 Chromium 把 video 从 overlay 降级成普通合成层，此时
+ * border-radius/overflow 才被合成器尊重，能稳定裁到 32px 圆角。
+ * 注意：不能给 .login-page 加 transform/isolation，否则会把它提升为
+ * 独立合成根，反而让 #root 的 clip-path 跨不过合成层边界，
+ * 导致整窗圆角退化成矩形。*/
+[data-platform="darwin"] .login-video-bg {
+  border-radius: 32px;
+  -electron-corner-smoothing: 60%;
+  overflow: hidden;
+  filter: brightness(1);
+}
+
+[data-platform="darwin"][data-rounded="false"] .login-video-bg {
+  border-radius: 0;
+  filter: none;
+}
+
+/* 全屏时仍保留 #root / .app 的 clip-path（四角在全屏下也不露桌面），
+ * 避免主进程 IPC 时序导致 data-rounded="false" 误移除即时整窗变矩形。
+ * 只对 webview / video 的下半圆角进行还原。*/
+[data-platform="darwin"][data-rounded="false"] .main-content {
+  clip-path: none;
+}
+[data-platform="darwin"][data-rounded="false"] .tab-content webview,
+[data-platform="darwin"][data-rounded="false"] .dt-container webview {
+  border-radius: 0;
 }
 
 /* ===== 布局 ===== */
@@ -683,7 +790,6 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  border-radius: 32px 32px 0 0;
   position: relative;
   background-color: var(--bg-primary);
   z-index: 1;

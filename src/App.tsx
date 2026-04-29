@@ -160,7 +160,21 @@ function App() {
     if (bridge?.platform) {
       document.documentElement.setAttribute('data-platform', bridge.platform)
     }
-    return () => { cleanupAbout?.() }
+
+    // 整窗四角圆角：仅 macOS，且窗口处于非最大化/非全屏状态时启用。
+    // 主进程会广播状态变化；这里把状态写到 <html data-rounded> 驱动 CSS。
+    const applyRounded = (rounded: boolean) => {
+      document.documentElement.setAttribute('data-rounded', rounded ? 'true' : 'false')
+    }
+    let cleanupRounded: (() => void) | undefined
+    if (bridge?.platform === 'darwin') {
+      bridge?.getWindowRoundedState?.().then((v: boolean) => applyRounded(!!v)).catch(() => {})
+      cleanupRounded = bridge?.onWindowRoundedStateChange?.((v: boolean) => applyRounded(!!v))
+    } else {
+      applyRounded(false)
+    }
+
+    return () => { cleanupAbout?.(); cleanupRounded?.() }
   }, [])
 
   // 登录状态管理

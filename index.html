@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title></title>
   </head>
-  <body style="margin:0;padding:0;height:100%;width:100%;background:#ffffff">
+  <!-- 不在 body 上设背景：macOS transparent 窗口下 body 白会从 #root 32px 圆角外漏出。
+       底色由 .app / .login-page 提供；Windows 由 BrowserWindow.backgroundColor=#ffffff 托底。-->
+  <body style="margin:0;padding:0;height:100%;width:100%">
     <div id="root" style="height:100%;width:100%"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
