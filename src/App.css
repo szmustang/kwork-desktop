@@ -79,47 +79,39 @@ body {
 [data-platform="darwin"] #root {
   border-radius: 32px;
   /* Electron 36+ 原生 squircle 平滑圆角（苹果风格），同时显著降低边缘锯齿感。*/
-  -electron-corner-smoothing: 60%;
+  -electron-corner-smoothing: 0%;
   overflow: hidden;
 }
 
 [data-platform="darwin"] .app {
   border-radius: 32px;
-  -electron-corner-smoothing: 60%;
+  -electron-corner-smoothing: 0%;
   overflow: hidden;
   isolation: isolate;
   position: relative;
-  /* 替代关闭的 NSWindow 系统阴影，沿圆角轮廓绘制软阴影。
-   * hairline 描边改由 .app::after 绘制，避免被 .main-content 白底覆盖。*/
+  /* 替代关闭的 NSWindow 系统阴影，沿圆角轮廓绘制软阴影。*/
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.04),
     0 12px 48px rgba(0, 0, 0, 0.18),
     0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-/* 主界面 32px 圆角 hairline：外层深灰 1px + 内层半透白 1px，
- * z-index 需高于所有子元素（main-content / webview / topbar）。*/
+/* 诊断用伪元素红边，置顶避免被 webview / video 遮盖。*/
 [data-platform="darwin"] .app::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
+  border: 1px solid #E7E7E7;
   border-radius: 32px;
-  -electron-corner-smoothing: 60%;
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.18),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.45);
   pointer-events: none;
-  z-index: 100;
-}
-
-[data-platform="darwin"][data-rounded="false"] .app::after {
-  display: none;
+  z-index: 9999;
+  box-sizing: border-box;
 }
 
 /* 主内容区承载 <webview>，单独对顶部两角做 clip-path，保证 webview 合成层被裁剪。*/
 [data-platform="darwin"] .main-content {
   border-radius: 32px 32px 0 0;
-  -electron-corner-smoothing: 60%;
+  -electron-corner-smoothing: 0%;
   clip-path: inset(0 round 32px 32px 0 0);
   /* 强制提升为独立合成层，clip-path 才会在合成器层级应用到 webview OOPIF。*/
   transform: translateZ(0);
@@ -132,7 +124,7 @@ body {
 [data-platform="darwin"] .tab-content webview,
 [data-platform="darwin"] .dt-container webview {
   border-radius: 32px 32px 0 0;
-  -electron-corner-smoothing: 60%;
+  -electron-corner-smoothing: 0%;
   overflow: hidden;
 }
 
@@ -147,10 +139,29 @@ body {
  * 独立合成根，反而让 #root 的 clip-path 跨不过合成层边界，
  * 导致整窗圆角退化成矩形。*/
 [data-platform="darwin"] .login-video-bg {
-  border-radius: 32px;
-  -electron-corner-smoothing: 60%;
   overflow: hidden;
   filter: brightness(1);
+}
+
+/* 登录页和 #root 用同一条 squircle 曲线裁子元素，避免 video 自裁圆角与
+ * #root 圆角曲线抑角不对齐、四角漏出背后的透明窗口 → 桌面。
+ * 同时提供与 video 淡紫基调接近的兔底色，video 加载前/圆角像素微差时托底。*/
+[data-platform="darwin"] .login-page {
+  border-radius: 32px;
+  -electron-corner-smoothing: 0%;
+  background: #e8e4f3;
+}
+
+/* 诊断用伪元素红边，置顶避免被全屏 video 遮盖。*/
+[data-platform="darwin"] .login-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid #E7E7E7;
+  border-radius: 32px;
+  pointer-events: none;
+  z-index: 9999;
+  box-sizing: border-box;
 }
 
 [data-platform="darwin"][data-rounded="false"] .login-video-bg {
