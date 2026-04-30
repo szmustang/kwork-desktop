@@ -163,7 +163,7 @@ function createWindow() {
     minHeight: 600,
     titleBarStyle: 'hidden',
     titleBarOverlay: isWin ? { color: '#00000000', symbolColor: '#666666', height: 40 } : undefined,
-    trafficLightPosition: { x: 12, y: 12 },
+    trafficLightPosition: { x: 20, y: 16 },
     // macOS 开启透明窗口，配合渲染层的 border-radius 实现整窗自定义圆角（仅在非最大化/非全屏状态下有效）。
     // Windows 继续使用不透明的矩形窗口，保留系统 Aero 阴影与传统外观。
     transparent: isMac,
